@@ -189,6 +189,66 @@ const THEMES = {
   },
 };
 
+/* --------------------- Relief léger du terrain -------------------------- */
+
+// Amplitude du relief par thème (1 par défaut ; la mer reste plate)
+const RELIEF = { ocean: 0, swamp: 0.6, volcano: 1.2, candy: 1.2, desert: 1.3, alien: 1.3 };
+const FLAT_PAD = 34; // rayon aplati autour de la plateforme
+const FLAT_EGGS = [{ x: 140, z: -95, r: 14 }, { x: -180, z: 120, r: 12 }, { x: 200, z: -160, r: 14 }];
+let terrainSpots = [];   // zones aplaties (mares) du thème courant
+let currentRelief = 1;
+let waterTex = null;     // texture d'eau animée du thème courant
+
+function smooth01(v) {
+  v = Math.min(1, Math.max(0, v));
+  return v * v * (3 - 2 * v);
+}
+
+// Hauteur du relief en (x, z) : collines douces analytiques, aplaties autour
+// de la plateforme, des mares et des secrets. Utilisée par le rendu ET la
+// physique (contacts, crashs, altitude HUD).
+function terrainH(x, z) {
+  if (currentRelief === 0) return 0;
+  let h = 3.2 * Math.sin(x * 0.011 + 1.7) * Math.cos(z * 0.013 + 0.6)
+        + 2.1 * Math.sin(x * 0.027 - 0.8) * Math.sin(z * 0.021 + 2.2)
+        + 1.2 * Math.cos(x * 0.05 + 0.3) * Math.cos(z * 0.043 - 1.1);
+  h = (h + 6.5) * 0.42 * currentRelief; // ≈ 0 … 5,5 m × relief
+  let k = smooth01((Math.hypot(x, z) - FLAT_PAD) / 40);
+  for (const s of terrainSpots) k = Math.min(k, smooth01((Math.hypot(x - s.x, z - s.z) - s.r) / 25));
+  for (const s of FLAT_EGGS) k = Math.min(k, smooth01((Math.hypot(x - s.x, z - s.z) - s.r) / 25));
+  return h * k;
+}
+
+// Texture procédurale de vaguelettes pour les plans d'eau (et de lave…)
+function makeWaterTexture(baseHex) {
+  const c = document.createElement("canvas");
+  c.width = c.height = 256;
+  const g = c.getContext("2d");
+  const base = new THREE.Color(baseHex);
+  g.fillStyle = `#${base.getHexString()}`;
+  g.fillRect(0, 0, 256, 256);
+  const light = base.clone().lerp(new THREE.Color(0xffffff), 0.4);
+  const dark = base.clone().multiplyScalar(0.7);
+  const rng = mulberry32(4242);
+  for (let i = 0; i < 36; i++) {
+    const col = i % 2 ? light : dark;
+    g.strokeStyle = `rgba(${(col.r * 255) | 0},${(col.g * 255) | 0},${(col.b * 255) | 0},${i % 2 ? 0.35 : 0.22})`;
+    g.lineWidth = 1.5 + rng() * 2.5;
+    g.beginPath();
+    const y0 = rng() * 256, amp = 3 + rng() * 6, ph = rng() * 6.28, wl = 40 + rng() * 70;
+    for (let x = -8; x <= 264; x += 8) {
+      const y = y0 + Math.sin((x / wl) * 6.28 + ph) * amp;
+      if (x === -8) g.moveTo(x, y); else g.lineTo(x, y);
+    }
+    g.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(2.5, 2.5);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 let envGroup = null;
 let currentTheme = THEMES.forest;
 let currentThemeName = null;
@@ -227,19 +287,16 @@ function buildEnvironment(name) {
   sky.renderOrder = -1;
   envGroup.add(sky);
 
-  // Sol
-  const ground = new THREE.Mesh(
-    new THREE.CircleGeometry(1700, 64),
-    new THREE.MeshStandardMaterial({ color: t.ground.c, roughness: t.ground.rough, metalness: t.ground.metal })
-  );
-  ground.rotation.x = -Math.PI / 2;
-  envGroup.add(ground);
-
-  // Mares / lacs / îlots / lave / cratères…
+  // Mares / lacs / îlots / lave / cratères… (positions d'abord : le relief
+  // s'aplatit autour de chacune), avec texture de vaguelettes animée
+  currentRelief = RELIEF[name] ?? 1;
   const pools = [];
+  waterTex = null;
   if (t.pools) {
+    waterTex = makeWaterTexture(t.pools.c);
     const mat = new THREE.MeshStandardMaterial({
-      color: t.pools.c, roughness: t.pools.rough, metalness: t.pools.metal,
+      color: 0xffffff, map: waterTex,
+      roughness: t.pools.rough, metalness: t.pools.metal,
       emissive: t.pools.emissive || 0x000000, emissiveIntensity: t.pools.ei || 0,
     });
     const geo = new THREE.CircleGeometry(1, 36);
@@ -252,10 +309,36 @@ function buildEnvironment(name) {
       pools.push({ x, z, rx, rz });
       const m = new THREE.Mesh(geo, mat);
       m.rotation.x = -Math.PI / 2;
-      m.position.set(x, 0.04, z);
+      m.position.set(x, 0.06, z);
       m.scale.set(rx, rz, 1);
       envGroup.add(m);
     }
+  }
+  terrainSpots = pools.map((p) => ({ x: p.x, z: p.z, r: Math.max(p.rx, p.rz) }));
+
+  // Sol vallonné : relief léger, crêtes légèrement éclaircies
+  {
+    const geo = new THREE.PlaneGeometry(3400, 3400, 110, 110);
+    geo.rotateX(-Math.PI / 2);
+    const pa = geo.getAttribute("position");
+    const colors = new Float32Array(pa.count * 3);
+    const base = new THREE.Color(t.ground.c);
+    const crest = base.clone().lerp(new THREE.Color(0xffffff), 0.2);
+    const cc = new THREE.Color();
+    for (let v = 0; v < pa.count; v++) {
+      const h = terrainH(pa.getX(v), pa.getZ(v));
+      pa.setY(v, h);
+      cc.lerpColors(base, crest, Math.min(h / 5.5, 1) * 0.9);
+      colors[v * 3] = cc.r;
+      colors[v * 3 + 1] = cc.g;
+      colors[v * 3 + 2] = cc.b;
+    }
+    geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    geo.computeVertexNormals();
+    const ground = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      vertexColors: true, roughness: t.ground.rough, metalness: t.ground.metal,
+    }));
+    envGroup.add(ground);
   }
 
   if (t.flora) buildFlora(t.flora, rng, pools, envGroup);
@@ -349,7 +432,7 @@ function buildFlora(spec, rng, pools, parent) {
       z = Math.sin(a) * d;
       if (pools.some((l) => ((x - l.x) / (l.rx + 4)) ** 2 + ((z - l.z) / (l.rz + 4)) ** 2 < 1)) continue;
     }
-    spots.push({ x, z, s: 0.8 + rng() * 1.2, h: rng() });
+    spots.push({ x, z, s: 0.8 + rng() * 1.2, h: rng(), t: terrainH(x, z) });
   }
 
   const stdMat = (c, rough = 0.9) => new THREE.MeshStandardMaterial({ color: c, roughness: rough, flatShading: true });
@@ -414,10 +497,10 @@ function buildFlora(spec, rng, pools, parent) {
         v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), col = new THREE.Color();
   spots.forEach((p, i) => {
     s3.setScalar(p.s);
-    m4.compose(v3.set(p.x, yA * p.s, p.z), q0, s3);
+    m4.compose(v3.set(p.x, yA * p.s + p.t, p.z), q0, s3);
     A.setMatrixAt(i, m4);
     if (sclB) s3.set(p.s * sclB[0], p.s * sclB[1], p.s * sclB[2]);
-    m4.compose(v3.set(p.x, yB * p.s, p.z), q0, s3);
+    m4.compose(v3.set(p.x, yB * p.s + p.t, p.z), q0, s3);
     B.setMatrixAt(i, m4);
     if (colorFn) { colorFn(p.h, col); B.setColorAt(i, col); }
   });
@@ -661,6 +744,7 @@ function buildObstacleField(cfg) {
 
   list.forEach((o, i) => {
     let mesh;
+    let yOff = 0;
     const center = new THREE.Vector3(...o.pos);
 
     if (o.kind === "box") {
@@ -701,7 +785,9 @@ function buildObstacleField(cfg) {
       }
 
     } else if (o.kind === "column") {
-      // Pilier rocheux ancré au sol : sphères de collision empilées
+      // Pilier rocheux ancré au sol (il suit le relief) : sphères empilées
+      const th = terrainH(o.pos[0], o.pos[2]);
+      yOff = th;
       mesh = new THREE.Mesh(
         new THREE.CylinderGeometry(o.size * 0.65, o.size * 1.05, o.h, 9),
         rockMaterial(o.hue, false)
@@ -709,7 +795,7 @@ function buildObstacleField(cfg) {
       const n = Math.max(2, Math.ceil(o.h / (o.size * 1.6)));
       for (let k = 0; k < n; k++) {
         colliders.push({
-          center: new THREE.Vector3(o.pos[0], ((k + 0.5) / n) * o.h, o.pos[2]),
+          center: new THREE.Vector3(o.pos[0], th + ((k + 0.5) / n) * o.h, o.pos[2]),
           r: o.size * 1.05, kind: o.kind,
         });
       }
@@ -728,7 +814,7 @@ function buildObstacleField(cfg) {
       colliders.push({ center, r: o.size * 1.15, kind: o.kind });
     }
 
-    mesh.position.set(...o.pos);
+    mesh.position.set(o.pos[0], o.pos[1] + yOff, o.pos[2]);
     mesh.rotation.set(...o.rot);
     asteroidGroup.add(mesh);
   });
@@ -744,7 +830,10 @@ function rockMaterial(hue, isBox) {
 function disposeGroup(g) {
   g.traverse((o) => {
     if (o.geometry) o.geometry.dispose();
-    if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose());
+    if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
+      if (m.map) m.map.dispose();
+      m.dispose();
+    });
   });
 }
 
@@ -782,7 +871,8 @@ function updateDebris(dt) {
     d.life -= dt;
     d.vel.y -= 9.81 * 0.7 * dt;
     d.mesh.position.addScaledVector(d.vel, dt);
-    if (d.mesh.position.y < 0.3) { d.mesh.position.y = 0.3; d.vel.y *= -0.35; d.vel.multiplyScalar(0.8); }
+    const gy = surfaceYAt(d.mesh.position.x, d.mesh.position.z) + 0.3;
+    if (d.mesh.position.y < gy) { d.mesh.position.y = gy; d.vel.y *= -0.35; d.vel.multiplyScalar(0.8); }
     d.mesh.rotation.x += d.spin.x * dt;
     d.mesh.rotation.y += d.spin.y * dt;
     if (d.life < 0.6) d.mesh.scale.setScalar(Math.max(d.life / 0.6, 0.01));
@@ -1182,9 +1272,9 @@ const _r = new THREE.Vector3();
 const _vp = new THREE.Vector3();
 const _F = new THREE.Vector3();
 
-// Hauteur du sol sous un point : plateau de la plateforme ou prairie.
+// Hauteur du sol sous un point : plateau de la plateforme ou relief du terrain.
 function surfaceYAt(x, z) {
-  return Math.hypot(x, z) < cfg.platformRadius + 0.4 ? PLATFORM_TOP : 0;
+  return Math.hypot(x, z) < cfg.platformRadius + 0.4 ? PLATFORM_TOP : terrainH(x, z);
 }
 
 function physicsStep(dt) {
@@ -1327,7 +1417,7 @@ function physicsStep(dt) {
       _foot.copy(fl).applyQuaternion(quat).add(pos);
       const hd = Math.hypot(_foot.x, _foot.z);
       if (_foot.y <= PLATFORM_TOP + 0.08 && hd <= cfg.platformRadius + 0.3) feetOn++;
-      else if (_foot.y <= 0.08) onGrass++;
+      else if (_foot.y <= terrainH(_foot.x, _foot.z) + 0.08) onGrass++;
     }
   }
   const still = vel.length() < 0.4 && angVel.length() < 0.3;
@@ -1435,7 +1525,7 @@ function updateHUD() {
   $("throttle-txt").textContent = `${Math.round(throttle * 100)} %`;
 
   const hDist = Math.hypot(pos.x, pos.z);
-  const surface = hDist < cfg.platformRadius ? PLATFORM_TOP : 0;
+  const surface = hDist < cfg.platformRadius ? PLATFORM_TOP : terrainH(pos.x, pos.z);
   const bottom = legsDeploy > 0.5 ? -FEET_LOCAL[0].y : ROCKET_BOTTOM;
   const alt = Math.max(0, pos.y - bottom - surface);
   setStat("stat-alt", `${alt.toFixed(0)} m`);
@@ -1539,6 +1629,10 @@ function animate() {
   if (state === "flying") physicsStep(dt);
   updateDebris(dt);
   updateEggAnims(dt);
+  if (waterTex) { // l'eau dérive doucement
+    waterTex.offset.x += dt * 0.012;
+    waterTex.offset.y += dt * 0.007;
+  }
   if (coinGroup && coinGroup.visible && coinSpin) {
     coinSpin.rotation.y += 2.2 * dt;
     coinSpin.position.y = Math.sin(performance.now() / 400) * 0.6;
