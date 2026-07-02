@@ -1,8 +1,14 @@
 # 🚀 Fusée T-Pack — jeu d'atterrissage 3D
 
 Un jeu 3D dans le navigateur : pilotez une fusée à travers des champs
-d'astéroïdes et posez-la **en douceur** sur la plateforme d'atterrissage.
-Le carburant est limité, et les 10 niveaux sont de difficulté croissante.
+de rochers flottants et posez-la **en douceur** sur la plateforme
+d'atterrissage, au cœur d'un paysage chaleureux de fin de journée
+(prairie, forêts, lacs, collines). Le carburant est limité, et les
+10 niveaux sont de difficulté croissante.
+
+Les commandes sont **relatives à l'écran** : « ↑ » incline toujours la
+fusée vers le fond de l'écran, même quand la caméra tourne autour de la
+plateforme — pas d'inversion des commandes.
 
 Construit avec [Three.js](https://threejs.org/) (embarqué dans `lib/`,
 aucune connexion internet nécessaire pour jouer).
@@ -51,10 +57,10 @@ Le jeu est aussi directement hébergeable sur GitHub Pages (aucun build).
 ## 🏁 Règles
 
 - L'atterrissage est réussi si, au contact de la plateforme :
-  - vitesse verticale ≤ **4,5 m/s** ;
-  - vitesse horizontale ≤ **3 m/s** ;
-  - inclinaison ≤ **18°** ;
-  - la fusée est **entièrement sur la plateforme**.
+  - vitesse verticale ≤ **7 m/s** ;
+  - vitesse horizontale ≤ **5 m/s** ;
+  - inclinaison ≤ **25°** ;
+  - le pied de la fusée touche le plateau — **n'importe où**, même au bord.
 - Toucher un astéroïde, le sol, ou arriver trop vite = 💥 crash.
 - Le réservoir est plein au départ de chaque niveau, mais de plus en plus
   juste au fil des niveaux — gérez la poussée !

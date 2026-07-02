@@ -16,9 +16,9 @@ const ROCKET_BOTTOM = 2.8;  // distance centre → bas de la fusée
 const PLATFORM_TOP = 2;     // hauteur du dessus de la plateforme
 
 // Seuils d'un atterrissage réussi
-const SAFE_VSPEED = 4.5;    // m/s vitesse verticale max au contact
-const SAFE_HSPEED = 3.0;    // m/s vitesse horizontale max
-const SAFE_TILT = 18;       // ° d'inclinaison max
+const SAFE_VSPEED = 7.0;    // m/s vitesse verticale max au contact
+const SAFE_HSPEED = 5.0;    // m/s vitesse horizontale max
+const SAFE_TILT = 25;       // ° d'inclinaison max
 
 const STORAGE_KEY = "tpack-unlocked";
 
@@ -36,8 +36,8 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0b0e1a);
-scene.fog = new THREE.Fog(0x0b0e1a, 250, 1100);
+scene.background = new THREE.Color(0xf2c491);
+scene.fog = new THREE.Fog(0xf2c491, 300, 1500);
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 4000);
 
@@ -47,39 +47,108 @@ window.addEventListener("resize", () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// Lumières
-scene.add(new THREE.HemisphereLight(0x7788ff, 0x23281f, 0.55));
-const sun = new THREE.DirectionalLight(0xffffff, 1.25);
-sun.position.set(120, 200, 90);
+// Lumières — fin de journée chaleureuse
+scene.add(new THREE.HemisphereLight(0xffd9a8, 0x3e5e3f, 0.6));
+const sun = new THREE.DirectionalLight(0xffdcb0, 1.3);
+sun.position.set(180, 140, 80);
 scene.add(sun);
-scene.add(new THREE.AmbientLight(0xffffff, 0.12));
+scene.add(new THREE.AmbientLight(0xfff1de, 0.18));
 
-// Étoiles
+// Décor naturel : ciel dégradé, prairie, lacs, arbres, collines
 {
-  const n = 1600, pos = new Float32Array(n * 3), rng = mulberry32(42);
-  for (let i = 0; i < n; i++) {
-    const u = rng() * 2 - 1, ph = rng() * Math.PI * 2, r = 1300 + rng() * 500;
-    const s = Math.sqrt(1 - u * u);
-    pos[i * 3] = r * s * Math.cos(ph);
-    pos[i * 3 + 1] = Math.abs(r * u) * 0.9 + 40;
-    pos[i * 3 + 2] = r * s * Math.sin(ph);
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xcfd8ff, size: 2.2, sizeAttenuation: false, fog: false })));
-}
+  // Dôme de ciel en dégradé (crépuscule doré)
+  const cv = document.createElement("canvas");
+  cv.width = 4; cv.height = 256;
+  const c2 = cv.getContext("2d");
+  const grad = c2.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0.0, "#5d8fc9");
+  grad.addColorStop(0.5, "#a9c6e0");
+  grad.addColorStop(0.78, "#f2c491");
+  grad.addColorStop(1.0, "#f7d9ac");
+  c2.fillStyle = grad;
+  c2.fillRect(0, 0, 4, 256);
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(1900, 32, 16),
+    new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), side: THREE.BackSide, fog: false, depthWrite: false })
+  );
+  sky.renderOrder = -1;
+  scene.add(sky);
 
-// Sol
-{
+  // Prairie
   const ground = new THREE.Mesh(
-    new THREE.CircleGeometry(1600, 64),
-    new THREE.MeshStandardMaterial({ color: 0x2a3330, roughness: 1 })
+    new THREE.CircleGeometry(1700, 64),
+    new THREE.MeshStandardMaterial({ color: 0x4d8a52, roughness: 1 })
   );
   ground.rotation.x = -Math.PI / 2;
   scene.add(ground);
-  const grid = new THREE.GridHelper(3000, 150, 0x1c2749, 0x141a30);
-  grid.position.y = 0.02;
-  scene.add(grid);
+
+  const rng = mulberry32(777);
+
+  // Lacs — ellipses d'eau, à l'écart de la plateforme
+  const lakes = [];
+  const lakeMat = new THREE.MeshStandardMaterial({ color: 0x4d90c9, roughness: 0.15, metalness: 0.35 });
+  const lakeGeo = new THREE.CircleGeometry(1, 36);
+  while (lakes.length < 9) {
+    const a = rng() * Math.PI * 2, d = 90 + rng() * 650;
+    const x = Math.cos(a) * d, z = Math.sin(a) * d;
+    const rx = 18 + rng() * 45, rz = 14 + rng() * 40;
+    if (Math.hypot(x, z) < Math.max(rx, rz) + 45) continue;
+    lakes.push({ x, z, rx, rz });
+    const lake = new THREE.Mesh(lakeGeo, lakeMat);
+    lake.rotation.x = -Math.PI / 2;
+    lake.position.set(x, 0.04, z);
+    lake.scale.set(rx, rz, 1);
+    scene.add(lake);
+  }
+
+  // Arbres (instanciés, décoratifs — pas de collision)
+  const spots = [];
+  let tries = 0;
+  while (spots.length < 400 && tries < 6000) {
+    tries++;
+    const a = rng() * Math.PI * 2, d = 35 + Math.pow(rng(), 0.75) * 800;
+    const x = Math.cos(a) * d, z = Math.sin(a) * d;
+    if (lakes.some((l) => ((x - l.x) / (l.rx + 4)) ** 2 + ((z - l.z) / (l.rz + 4)) ** 2 < 1)) continue;
+    spots.push({ x, z, s: 0.8 + rng() * 1.2, h: rng() });
+  }
+  const trunks = new THREE.InstancedMesh(
+    new THREE.CylinderGeometry(0.22, 0.34, 2.4, 6),
+    new THREE.MeshStandardMaterial({ color: 0x7a5230, roughness: 0.95 }),
+    spots.length
+  );
+  const crowns = new THREE.InstancedMesh(
+    new THREE.ConeGeometry(1.8, 4.6, 8),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, flatShading: true }),
+    spots.length
+  );
+  const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(),
+        v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), col = new THREE.Color();
+  spots.forEach((p, i) => {
+    s3.setScalar(p.s);
+    m4.compose(v3.set(p.x, 1.2 * p.s, p.z), q0, s3);
+    trunks.setMatrixAt(i, m4);
+    m4.compose(v3.set(p.x, 4.0 * p.s, p.z), q0, s3);
+    crowns.setMatrixAt(i, m4);
+    col.setHSL(0.29 + p.h * 0.07, 0.5, 0.26 + p.h * 0.14);
+    crowns.setColorAt(i, col);
+  });
+  scene.add(trunks, crowns);
+
+  // Collines à l'horizon
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2 + rng() * 0.4;
+    const d = 850 + rng() * 500;
+    const r = 140 + rng() * 220, h = 70 + rng() * 130;
+    const hill = new THREE.Mesh(
+      new THREE.ConeGeometry(r, h, 7),
+      new THREE.MeshStandardMaterial({
+        color: new THREE.Color().setHSL(0.35 + rng() * 0.06, 0.25, 0.32 + rng() * 0.1),
+        roughness: 1, flatShading: true,
+      })
+    );
+    hill.position.set(Math.cos(a) * d, h / 2 - 2, Math.sin(a) * d);
+    scene.add(hill);
+  }
 }
 
 /* --------------------------- Plateforme -------------------------------- */
@@ -486,7 +555,9 @@ function crash(reason) {
 
 /* ============================ Physique ================================== */
 
+const UP = new THREE.Vector3(0, 1, 0);
 const _axis = new THREE.Vector3();
+const _fwd = new THREE.Vector3();
 const _dq = new THREE.Quaternion();
 const _up = new THREE.Vector3();
 const _p = new THREE.Vector3();
@@ -494,14 +565,20 @@ const _p = new THREE.Vector3();
 function physicsStep(dt) {
   elapsed += dt;
 
-  // --- Rotation (commandes en repère fusée) ---
+  // --- Rotation (commandes relatives à l'écran : « ↑ » incline toujours la
+  // fusée vers le fond de l'écran, même quand la caméra tourne autour de la
+  // plateforme — pas d'inversion des commandes) ---
   const pitch = (input.pitchUp ? -1 : 0) + (input.pitchDown ? 1 : 0);
-  const roll = (input.rollL ? 1 : 0) + (input.rollR ? -1 : 0);
+  const roll = (input.rollR ? 1 : 0) + (input.rollL ? -1 : 0);
   const yaw = (input.yawL ? 1 : 0) + (input.yawR ? -1 : 0);
 
-  if (pitch) angVel.addScaledVector(_axis.set(1, 0, 0).applyQuaternion(quat), pitch * ANG_ACCEL * dt);
-  if (roll) angVel.addScaledVector(_axis.set(0, 0, 1).applyQuaternion(quat), roll * ANG_ACCEL * dt);
-  if (yaw) angVel.addScaledVector(_axis.set(0, 1, 0).applyQuaternion(quat), yaw * YAW_ACCEL * dt);
+  if (pitch || roll) {
+    _fwd.copy(camDir).negate();          // direction « fond de l'écran » (horizontale)
+    _axis.crossVectors(_fwd, UP);        // direction « droite de l'écran »
+    if (pitch) angVel.addScaledVector(_axis, pitch * ANG_ACCEL * dt);
+    if (roll) angVel.addScaledVector(_fwd, roll * ANG_ACCEL * dt);
+  }
+  if (yaw) angVel.addScaledVector(UP, yaw * YAW_ACCEL * dt);
 
   angVel.multiplyScalar(Math.exp(-ANG_DAMP * dt));
 
@@ -561,15 +638,16 @@ function checkCollisions() {
   const bottomY = pos.y - ROCKET_BOTTOM;
   const hDist = Math.hypot(pos.x, pos.z);
 
-  // Contact avec la plateforme
-  if (bottomY <= PLATFORM_TOP + 0.05 && hDist < cfg.platformRadius + 1.0) {
+  // Contact avec la plateforme — l'atterrissage est valide n'importe où sur
+  // le plateau, du moment que le pied de la fusée (rayon ~0,9 m) le touche.
+  if (bottomY <= PLATFORM_TOP + 0.05 && hDist < cfg.platformRadius + 2.0) {
     const vs = -vel.y;
     const hs = Math.hypot(vel.x, vel.z);
     const tilt = tiltDeg();
     if (vs > SAFE_VSPEED) crash(`Impact trop violent : ${vs.toFixed(1)} m/s à la verticale (max ${SAFE_VSPEED}).`);
     else if (tilt > SAFE_TILT) crash(`Fusée trop inclinée au contact : ${Math.round(tilt)}° (max ${SAFE_TILT}°).`);
     else if (hs > SAFE_HSPEED) crash(`La fusée glissait trop vite : ${hs.toFixed(1)} m/s à l'horizontale (max ${SAFE_HSPEED}).`);
-    else if (hDist > cfg.platformRadius) crash("La fusée a raté le bord de la plateforme.");
+    else if (hDist > cfg.platformRadius + 0.9) crash("La fusée s'est posée à cheval sur le bord de la plateforme.");
     else landSuccess();
     return;
   }
@@ -591,6 +669,12 @@ function updateCamera(dt, snap = false) {
   _desired.set(pos.x, 0, pos.z);
   if (_desired.lengthSq() > 1) _desired.normalize();
   else _desired.copy(camDir);
+
+  // Directions quasi opposées : l'interpolation directe s'annulerait au
+  // milieu — on contourne par le côté pour que la caméra pivote toujours.
+  if (!snap && camDir.dot(_desired) < -0.7) {
+    _desired.set(-camDir.z, 0, camDir.x).add(camDir.clone().multiplyScalar(0.3)).normalize();
+  }
 
   if (snap) camDir.copy(_desired);
   else camDir.lerp(_desired, 1 - Math.exp(-1.6 * dt)).normalize();
@@ -722,7 +806,7 @@ function animate() {
 }
 
 // Exposé pour le débogage et les tests automatisés
-const GAME = { state, fuel, level: 1, pos, vel, quat, startLevel, beginFlight, showMenu };
+const GAME = { state, fuel, level: 1, pos, vel, quat, camDir, startLevel, beginFlight, showMenu };
 window.GAME = GAME;
 
 showMenu();

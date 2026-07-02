@@ -12,16 +12,16 @@
 //   seed           graine du générateur (champ identique à chaque partie)
 
 export const LEVELS = [
-  { name: "Premier envol",   fuel: 130, gravity: 9.81, spawn: [0, 70, 30],     platformRadius: 14,  asteroids: 0,  corridor: 0,  maxHeight: 0,  seed: 101 },
-  { name: "Dérive douce",    fuel: 115, gravity: 9.81, spawn: [0, 72, 85],     platformRadius: 12,  asteroids: 7,  corridor: 30, maxHeight: 55, seed: 202 },
-  { name: "Champ clairsemé", fuel: 110, gravity: 9.81, spawn: [20, 78, 125],   platformRadius: 11,  asteroids: 13, corridor: 34, maxHeight: 62, seed: 303 },
-  { name: "Slalom rocheux",  fuel: 105, gravity: 9.81, spawn: [-30, 82, 155],  platformRadius: 10,  asteroids: 20, corridor: 36, maxHeight: 68, seed: 404 },
-  { name: "La ceinture",     fuel: 100, gravity: 9.81, spawn: [40, 86, 185],   platformRadius: 9,   asteroids: 28, corridor: 38, maxHeight: 74, seed: 505 },
-  { name: "Passage étroit",  fuel: 95,  gravity: 9.81, spawn: [0, 90, 215],    platformRadius: 8.5, asteroids: 36, corridor: 30, maxHeight: 80, seed: 606 },
-  { name: "Gravité lourde",  fuel: 105, gravity: 12.0, spawn: [-50, 92, 225],  platformRadius: 8,   asteroids: 40, corridor: 38, maxHeight: 82, seed: 707 },
-  { name: "Mer de pierres",  fuel: 95,  gravity: 9.81, spawn: [60, 96, 255],   platformRadius: 7,   asteroids: 50, corridor: 42, maxHeight: 88, seed: 808 },
-  { name: "Le gant",         fuel: 90,  gravity: 9.81, spawn: [0, 102, 285],   platformRadius: 6.5, asteroids: 62, corridor: 32, maxHeight: 94, seed: 909 },
-  { name: "L'aiguille",      fuel: 90,  gravity: 12.0, spawn: [-70, 110, 305], platformRadius: 5.5, asteroids: 74, corridor: 40, maxHeight: 100, seed: 1010 },
+  { name: "Premier envol",   fuel: 130, gravity: 9.81, spawn: [0, 70, 30],     platformRadius: 12,  asteroids: 0,  corridor: 0,  maxHeight: 0,  seed: 101 },
+  { name: "Dérive douce",    fuel: 115, gravity: 9.81, spawn: [0, 72, 85],     platformRadius: 10.5, asteroids: 7,  corridor: 30, maxHeight: 55, seed: 202 },
+  { name: "Champ clairsemé", fuel: 110, gravity: 9.81, spawn: [20, 78, 125],   platformRadius: 9.5, asteroids: 13, corridor: 34, maxHeight: 62, seed: 303 },
+  { name: "Slalom rocheux",  fuel: 105, gravity: 9.81, spawn: [-30, 82, 155],  platformRadius: 9,   asteroids: 20, corridor: 36, maxHeight: 68, seed: 404 },
+  { name: "La ceinture",     fuel: 100, gravity: 9.81, spawn: [40, 86, 185],   platformRadius: 8,   asteroids: 28, corridor: 38, maxHeight: 74, seed: 505 },
+  { name: "Passage étroit",  fuel: 95,  gravity: 9.81, spawn: [0, 90, 215],    platformRadius: 7.5, asteroids: 36, corridor: 30, maxHeight: 80, seed: 606 },
+  { name: "Gravité lourde",  fuel: 105, gravity: 12.0, spawn: [-50, 92, 225],  platformRadius: 7,   asteroids: 40, corridor: 38, maxHeight: 82, seed: 707 },
+  { name: "Mer de pierres",  fuel: 95,  gravity: 9.81, spawn: [60, 96, 255],   platformRadius: 6.5, asteroids: 50, corridor: 42, maxHeight: 88, seed: 808 },
+  { name: "Le gant",         fuel: 90,  gravity: 9.81, spawn: [0, 102, 285],   platformRadius: 6,   asteroids: 62, corridor: 32, maxHeight: 94, seed: 909 },
+  { name: "L'aiguille",      fuel: 90,  gravity: 12.0, spawn: [-70, 110, 305], platformRadius: 5,   asteroids: 74, corridor: 40, maxHeight: 100, seed: 1010 },
 ];
 
 // Générateur pseudo-aléatoire déterministe (mulberry32).
