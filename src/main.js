@@ -198,6 +198,18 @@ const THEMES = {
     rock: [0.58, 0.06, 0.1, 0.1, 0.2, 0.12],
     particles: { c: 0x9ab0c0, n: 600, h: 80 }, // pluie en suspension
   },
+  eclipse: { // le monde de l'Éclipse Finale
+    sky: [[0, "#050208"], [0.55, "#150a18"], [0.8, "#3a1020"], [1, "#6a1c28"]],
+    fog: [0x2a1018, 220, 1200],
+    hemi: [0x8a4a5a, 0x140a10, 0.45], sun: [0xff6a5a, 0.7], amb: [0xaa5a6a, 0.15],
+    ground: { c: 0x2a2226, rough: 1, metal: 0 }, // cendres
+    pools: { n: 9, c: 0x8a1a2a, rough: 0.3, metal: 0.2, emissive: 0xcc1a2a, ei: 0.7 }, // mares écarlates
+    flora: { type: "charspike", n: 300 },
+    hills: { shape: "cone", n: 14, hsl: [0.98, 0.2, 0.12] },
+    rock: [0.97, 0.05, 0.2, 0.15, 0.18, 0.12],
+    stars: true, eclipse: true,
+    particles: { c: 0xff7a5a, n: 500, h: 60 },
+  },
 };
 
 /* --------------------- Relief léger du terrain -------------------------- */
@@ -215,6 +227,7 @@ const TERRAIN = {
   candy:   { a: 12,  d: 4 },   // collines de guimauve
   alien:   { a: 14,  d: 5 },
   storm:   { a: 13,  d: 4 },
+  eclipse: { a: 15,  d: 5 },
 };
 const FLAT_PAD = 34; // rayon aplati autour de la plateforme
 const FLAT_EGGS = [{ x: 140, z: -95, r: 14 }, { x: -180, z: 120, r: 12 }, { x: 200, z: -160, r: 14 }];
@@ -426,6 +439,22 @@ function buildEnvironment(name) {
     ring.rotation.x = 1.9;
     ring.rotation.y = 0.4;
     envGroup.add(ring);
+  }
+  if (t.eclipse) {
+    // Soleil noir à couronne de feu, suspendu dans le ciel
+    const g = new THREE.Group();
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(48, 40), new THREE.MeshBasicMaterial({ color: 0x000000, fog: false }));
+    disc.position.z = 2;
+    g.add(disc);
+    const corona = new THREE.Mesh(new THREE.TorusGeometry(50, 7, 12, 48),
+      new THREE.MeshBasicMaterial({ color: 0xffd9a8, fog: false }));
+    g.add(corona);
+    const halo = new THREE.Mesh(new THREE.TorusGeometry(56, 14, 12, 48),
+      new THREE.MeshBasicMaterial({ color: 0xff7a3a, fog: false, transparent: true, opacity: 0.35 }));
+    g.add(halo);
+    g.position.set(380, 430, -820);
+    g.lookAt(0, 40, 0);
+    envGroup.add(g);
   }
   if (t.particles) {
     const n = t.particles.n, posArr = new Float32Array(n * 3);
@@ -1284,7 +1313,7 @@ function landSuccess() {
   const stats = `Carburant restant : ${Math.round(fuel)} u · Temps : ${elapsed.toFixed(1)} s` +
     (cfg.timeLimit ? ` (${(cfg.timeLimit - elapsed).toFixed(1)} s d'avance !)` : "");
   if (levelIndex === LEVELS.length - 1) {
-    showOverlay("🏆 L'Épreuve Extrême est vaincue !", `Les ${LEVELS.length} niveaux sont maîtrisés. Chapeau bas, pilote !\n${stats}`,
+    showOverlay("🏆 Défi ultime accompli !", `${cfg.name} n'a pas résisté : les ${LEVELS.length} niveaux sont maîtrisés. Chapeau bas, pilote !\n${stats}`,
       [["Rejouer ce niveau", () => startLevel(levelIndex)], ["Menu", showMenu]]);
   } else {
     showOverlay("🎉 Atterrissage réussi !", stats, [

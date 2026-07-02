@@ -41,6 +41,11 @@ export const LEVELS = [
     coins: [[-120, 45, 60], [90, 55, -130], [140, 40, 150]], timeLimit: 90,
     obstacles: 120, maxHeight: 100, seed: 1111,
     types: { rock: 2, box: 1, crystal: 2, ring: 2, column: 1.8 } },
+  // Le défi ultime : 5 pièces aux cinq coins de la carte, chrono serré
+  { name: "L'Éclipse Finale",    theme: "eclipse", fuel: 175, gravity: 9.81, spawn: [-90, 115, 320], platformRadius: 4.5,
+    coins: [[-140, 50, -80], [150, 45, -60], [0, 60, -180], [-60, 40, 170], [160, 55, 140]], timeLimit: 150,
+    obstacles: 150, maxHeight: 105, seed: 1212,
+    types: { rock: 2, box: 1, crystal: 2.2, ring: 2.2, column: 2 } },
 ];
 
 // Générateur pseudo-aléatoire déterministe (mulberry32).

@@ -98,6 +98,7 @@ Le jeu est aussi directement hébergeable sur GitHub Pages (aucun build).
 | 9 | Le Royaume Sucré | Tout rose, sucettes géantes, lagons menthe |
 | 10 | La Planète X | Ciel noir, planète annelée, flèches aliens — ⚠️ gravité 12 m/s² |
 | 11 | **L'Épreuve Extrême** | Monde d'orage — ⏱ **90 s chrono**, **3 pièces** à collecter, 120 obstacles |
+| 12 | **L'Éclipse Finale** | Soleil noir, cendres et mares écarlates — ⏱ **150 s**, **5 pièces**, 150 obstacles, plateforme de 4,5 m |
 
 ## 🗂 Structure du projet
 
