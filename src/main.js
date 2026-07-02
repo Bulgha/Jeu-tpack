@@ -191,31 +191,49 @@ const THEMES = {
 
 /* --------------------- Relief léger du terrain -------------------------- */
 
-// Amplitude du relief par thème (1 par défaut ; la mer reste plate)
-const RELIEF = { ocean: 0, swamp: 0.6, volcano: 1.2, candy: 1.2, desert: 1.3, alien: 1.3 };
+// Relief par thème : a = amplitude des collines (m), d = crêtes de dunes (m)
+const TERRAIN = {
+  forest:  { a: 8,   d: 0 },
+  ice:     { a: 10,  d: 2 },
+  mystic:  { a: 11,  d: 0 },
+  desert:  { a: 15,  d: 6 },   // vraies dunes à crêtes
+  volcano: { a: 13,  d: 3 },
+  ocean:   { a: 0,   d: 0 },   // la mer reste plate
+  swamp:   { a: 3.5, d: 0 },   // marais presque plat
+  night:   { a: 8,   d: 0 },
+  candy:   { a: 12,  d: 4 },   // collines de guimauve
+  alien:   { a: 14,  d: 5 },
+};
 const FLAT_PAD = 34; // rayon aplati autour de la plateforme
 const FLAT_EGGS = [{ x: 140, z: -95, r: 14 }, { x: -180, z: 120, r: 12 }, { x: 200, z: -160, r: 14 }];
-let terrainSpots = [];   // zones aplaties (mares) du thème courant
-let currentRelief = 1;
-let waterTex = null;     // texture d'eau animée du thème courant
+let terrainSpots = [];              // zones aplaties (mares) du thème courant
+let terrainAmp = 8, terrainDune = 0; // relief du thème courant
+let waterTex = null;                // texture d'eau animée du thème courant
 
 function smooth01(v) {
   v = Math.min(1, Math.max(0, v));
   return v * v * (3 - 2 * v);
 }
 
-// Hauteur du relief en (x, z) : collines douces analytiques, aplaties autour
-// de la plateforme, des mares et des secrets. Utilisée par le rendu ET la
-// physique (contacts, crashs, altitude HUD).
+// Hauteur du relief en (x, z) : houle ample + collines + crêtes de dunes,
+// aplati autour de la plateforme, des mares et des secrets. Utilisée par le
+// rendu ET la physique (contacts, crashs, altitude HUD).
 function terrainH(x, z) {
-  if (currentRelief === 0) return 0;
-  let h = 3.2 * Math.sin(x * 0.011 + 1.7) * Math.cos(z * 0.013 + 0.6)
-        + 2.1 * Math.sin(x * 0.027 - 0.8) * Math.sin(z * 0.021 + 2.2)
-        + 1.2 * Math.cos(x * 0.05 + 0.3) * Math.cos(z * 0.043 - 1.1);
-  h = (h + 6.5) * 0.42 * currentRelief; // ≈ 0 … 5,5 m × relief
-  let k = smooth01((Math.hypot(x, z) - FLAT_PAD) / 40);
-  for (const s of terrainSpots) k = Math.min(k, smooth01((Math.hypot(x - s.x, z - s.z) - s.r) / 25));
-  for (const s of FLAT_EGGS) k = Math.min(k, smooth01((Math.hypot(x - s.x, z - s.z) - s.r) / 25));
+  if (terrainAmp === 0) return 0;
+  let b = 0.5
+    + 0.30 * Math.sin(x * 0.006 + 1.7) * Math.cos(z * 0.007 + 0.6)
+    + 0.16 * Math.sin(x * 0.013 + 0.5) * Math.cos(z * 0.011 - 0.9)
+    + 0.09 * Math.sin(x * 0.027 - 0.8) * Math.sin(z * 0.021 + 2.2)
+    + 0.05 * Math.cos(x * 0.05 + 0.3) * Math.cos(z * 0.043 - 1.1);
+  b = Math.min(1, Math.max(0, b));
+  let h = b * terrainAmp;
+  if (terrainDune > 0) {
+    const ridge = 1 - Math.abs(Math.sin(x * 0.009 + z * 0.012 + 0.8));
+    h += ridge * ridge * terrainDune;
+  }
+  let k = smooth01((Math.hypot(x, z) - FLAT_PAD) / 60);
+  for (const s of terrainSpots) k = Math.min(k, smooth01((Math.hypot(x - s.x, z - s.z) - s.r) / 35));
+  for (const s of FLAT_EGGS) k = Math.min(k, smooth01((Math.hypot(x - s.x, z - s.z) - s.r) / 35));
   return h * k;
 }
 
@@ -289,7 +307,9 @@ function buildEnvironment(name) {
 
   // Mares / lacs / îlots / lave / cratères… (positions d'abord : le relief
   // s'aplatit autour de chacune), avec texture de vaguelettes animée
-  currentRelief = RELIEF[name] ?? 1;
+  const terrainCfg = TERRAIN[name] || TERRAIN.forest;
+  terrainAmp = terrainCfg.a;
+  terrainDune = terrainCfg.d;
   const pools = [];
   waterTex = null;
   if (t.pools) {
@@ -316,19 +336,20 @@ function buildEnvironment(name) {
   }
   terrainSpots = pools.map((p) => ({ x: p.x, z: p.z, r: Math.max(p.rx, p.rz) }));
 
-  // Sol vallonné : relief léger, crêtes légèrement éclaircies
+  // Sol vallonné : dunes et collines, crêtes légèrement éclaircies
   {
-    const geo = new THREE.PlaneGeometry(3400, 3400, 110, 110);
+    const geo = new THREE.PlaneGeometry(3400, 3400, 128, 128);
     geo.rotateX(-Math.PI / 2);
     const pa = geo.getAttribute("position");
     const colors = new Float32Array(pa.count * 3);
     const base = new THREE.Color(t.ground.c);
-    const crest = base.clone().lerp(new THREE.Color(0xffffff), 0.2);
+    const crest = base.clone().lerp(new THREE.Color(0xffffff), 0.22);
     const cc = new THREE.Color();
+    const maxAmp = Math.max(1, terrainAmp + terrainDune);
     for (let v = 0; v < pa.count; v++) {
       const h = terrainH(pa.getX(v), pa.getZ(v));
       pa.setY(v, h);
-      cc.lerpColors(base, crest, Math.min(h / 5.5, 1) * 0.9);
+      cc.lerpColors(base, crest, Math.min(h / maxAmp, 1) * 0.95);
       colors[v * 3] = cc.r;
       colors[v * 3 + 1] = cc.g;
       colors[v * 3 + 2] = cc.b;
@@ -745,7 +766,13 @@ function buildObstacleField(cfg) {
   list.forEach((o, i) => {
     let mesh;
     let yOff = 0;
-    const center = new THREE.Vector3(...o.pos);
+    // Les obstacles flottants sont soulevés au-dessus des dunes : rien
+    // ne doit rester enterré (et donc invisible) dans le relief.
+    if (o.kind !== "column") {
+      const minY = terrainH(o.pos[0], o.pos[2]) + o.size + 3;
+      if (o.pos[1] < minY) yOff = minY - o.pos[1];
+    }
+    const center = new THREE.Vector3(o.pos[0], o.pos[1] + yOff, o.pos[2]);
 
     if (o.kind === "box") {
       mesh = new THREE.Mesh(
@@ -1495,7 +1522,8 @@ function updateCamera(dt, snap = false) {
 
   _camTarget.copy(pos).addScaledVector(camDir, 26);
   _camTarget.y = pos.y + 11;
-  if (_camTarget.y < 3) _camTarget.y = 3;
+  const camFloor = Math.max(3, terrainH(_camTarget.x, _camTarget.z) + 4);
+  if (_camTarget.y < camFloor) _camTarget.y = camFloor;
 
   if (snap) camera.position.copy(_camTarget);
   else camera.position.lerp(_camTarget, 1 - Math.exp(-3.5 * dt));
