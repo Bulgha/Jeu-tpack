@@ -96,7 +96,8 @@ Le bouton **⚙ Réglages** du menu permet :
 - de consulter les **meilleurs temps** de chaque niveau ;
 - de choisir le mode de commande : **Clavier** (caméra automatique qui
   garde la cible dans l'axe) ou **Clavier + souris** (caméra libre :
-  la souris fait orbiter la vue autour de la fusée, molette pour zoomer).
+  la souris fait orbiter la vue autour de la fusée, molette pour zoomer,
+  **clic gauche maintenu = propulsion**).
 
 ## 🌌 Les 10 niveaux — un monde différent à chaque fois
 

@@ -1331,6 +1331,7 @@ let unlocked = parseInt(localStorage.getItem(STORAGE_KEY) || "1", 10);
 if (!(unlocked >= 1 && unlocked <= LEVELS.length)) unlocked = Math.min(Math.max(unlocked, 1), LEVELS.length) || 1;
 
 const input = { pitchUp: false, pitchDown: false, rollL: false, rollR: false, yawL: false, yawR: false, thrust: false };
+let mouseThrust = false; // clic gauche en mode « clavier + souris »
 
 /* --------------------------- Navigation -------------------------------- */
 
@@ -1561,7 +1562,7 @@ function physicsStep(dt) {
   const legsOut = legsDeploy >= 0.95;
 
   // --- Poussée & carburant (au sol comme en vol : on peut se rattraper) ---
-  const thrusting = input.thrust && fuel > 0;
+  const thrusting = (input.thrust || mouseThrust) && fuel > 0;
   if (thrusting) fuel = Math.max(0, fuel - BURN_RATE * throttle * dt);
 
   // --- Intégration en sous-pas : les contacts pied/sol sont raides ---
@@ -1756,6 +1757,19 @@ window.addEventListener("mousemove", (e) => {
   camPitch = THREE.MathUtils.clamp(camPitch + e.movementY * 0.0035, 0.08, 1.15);
 });
 
+// Mode « clavier + souris » : clic gauche maintenu = propulsion
+window.addEventListener("mousedown", (e) => {
+  if (!settings.mouseCam || e.button !== 0) return;
+  if (state === "menu" || state === "paused") return;
+  if (e.target.closest("button, input, label, #settings, #overlay-buttons")) return;
+  ensureAudio();
+  mouseThrust = true;
+  if (state === "ready") beginFlight();
+});
+window.addEventListener("mouseup", (e) => {
+  if (e.button === 0) mouseThrust = false;
+});
+
 function updateCamera(dt, snap = false) {
   if (settings.mouseCam) {
     // Caméra libre : orbite pilotée à la souris
@@ -1910,6 +1924,7 @@ window.addEventListener("keyup", (e) => {
 
 window.addEventListener("blur", () => {
   Object.keys(input).forEach((k) => (input[k] = false));
+  mouseThrust = false;
   if (state === "flying") togglePause();
 });
 
