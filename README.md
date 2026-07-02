@@ -9,8 +9,20 @@ aucune connexion internet nécessaire pour jouer).
 
 ## ▶️ Lancer le jeu
 
-Le jeu utilise des modules JavaScript : il faut le servir en HTTP
-(ouvrir `index.html` directement ne fonctionne pas).
+### Le plus simple : double-clic, sans rien installer
+
+Le fichier **`Fusee-T-Pack.html`** contient le jeu complet en un seul
+fichier : téléchargez-le et **double-cliquez dessus**, il s'ouvre
+directement dans le navigateur. Aucun serveur, aucune installation,
+aucune connexion nécessaires.
+
+(Après une modification du code source, régénérez-le avec
+`npm i esbuild` puis `node tools/build-standalone.mjs`.)
+
+### Version développement (fichiers séparés)
+
+`index.html` utilise des modules JavaScript : il faut le servir en HTTP
+(l'ouvrir directement ne fonctionne pas).
 
 ```bash
 # Au choix :
@@ -67,11 +79,13 @@ Le jeu est aussi directement hébergeable sur GitHub Pages (aucun build).
 ## 🗂 Structure du projet
 
 ```
-index.html      Page, menus et HUD (interface en français)
-style.css       Styles de l'interface
-src/main.js     Jeu : physique, rendu 3D, caméra, collisions, audio
-src/levels.js   Définition des 10 niveaux + génération des astéroïdes
-lib/            Three.js r166 embarqué (licence MIT, voir THREE-LICENSE.txt)
+Fusee-T-Pack.html   Jeu complet en un seul fichier (ouvrable par double-clic)
+index.html          Page, menus et HUD (interface en français)
+style.css           Styles de l'interface
+src/main.js         Jeu : physique, rendu 3D, caméra, collisions, audio
+src/levels.js       Définition des 10 niveaux + génération des astéroïdes
+lib/                Three.js r166 embarqué (licence MIT, voir THREE-LICENSE.txt)
+tools/              Script de génération du fichier autonome
 ```
 
 ## ⚙️ Réglages (pour ajuster la difficulté)
