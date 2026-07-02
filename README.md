@@ -82,20 +82,20 @@ Le jeu est aussi directement hébergeable sur GitHub Pages (aucun build).
 - Un niveau réussi débloque le suivant (progression sauvegardée dans le
   navigateur via `localStorage`).
 
-## 🌌 Les 10 niveaux
+## 🌌 Les 10 niveaux — un monde différent à chaque fois
 
-| # | Nom | Particularité |
+| # | Nom | Environnement |
 |---|---|---|
-| 1 | Premier envol | Aucun obstacle, grande plateforme |
-| 2 | Dérive douce | Premiers astéroïdes |
-| 3 | Champ clairsemé | Plus de distance |
-| 4 | Slalom rocheux | Le champ se densifie |
-| 5 | La ceinture | Ceinture d'astéroïdes |
-| 6 | Passage étroit | Couloir resserré |
-| 7 | Gravité lourde | ⚠️ Gravité renforcée (12 m/s²) |
-| 8 | Mer de pierres | Champ dense, petite plateforme |
-| 9 | Le gant | Couloir étroit et dense |
-| 10 | L'aiguille | Gravité renforcée + plateforme minuscule |
+| 1 | La Forêt d'Émeraude | Prairie dorée, sapins, lacs |
+| 2 | Le Monde de Glace | Neige, sapins givrés, lacs gelés, flocons |
+| 3 | Les Terres Mystiques | Ciel violet, champignons luminescents, étoiles |
+| 4 | Le Grand Désert | Dunes, cactus, mesas, oasis |
+| 5 | La Fournaise | Basalte, lacs de lave, pics incandescents, braises |
+| 6 | L'Archipel | Pleine mer, îlots de sable, palmiers |
+| 7 | Le Marais Toxique | Brume verte, mares d'acide, arbres morts — ⚠️ gravité 12 m/s² |
+| 8 | La Nuit des Lucioles | Nuit étoilée, pleine lune, lucioles |
+| 9 | Le Royaume Sucré | Tout rose, sucettes géantes, lagons menthe |
+| 10 | La Planète X | Ciel noir, planète annelée, flèches aliens — ⚠️ gravité 12 m/s² |
 
 ## 🗂 Structure du projet
 

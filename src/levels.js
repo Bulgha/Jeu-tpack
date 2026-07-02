@@ -2,6 +2,7 @@
 //
 // Chaque niveau précise :
 //   name           nom affiché
+//   theme          environnement du niveau (voir THEMES dans main.js)
 //   fuel           carburant au départ (unités)
 //   gravity        gravité du niveau (m/s²)
 //   spawn          position de départ de la fusée [x, y, z]
@@ -15,25 +16,25 @@
 //   seed           graine du générateur (champ identique à chaque partie)
 
 export const LEVELS = [
-  { name: "Premier envol",   fuel: 160, gravity: 9.81, spawn: [0, 70, 30],     platformRadius: 12,  coin: [0, 25, -50],     obstacles: 6,  maxHeight: 45,  seed: 101,
+  { name: "La Forêt d'Émeraude", theme: "forest", fuel: 160, gravity: 9.81, spawn: [0, 70, 30],     platformRadius: 12,  coin: [0, 25, -50],     obstacles: 6,  maxHeight: 45,  seed: 101,
     types: { rock: 1 } },
-  { name: "Dérive douce",    fuel: 150, gravity: 9.81, spawn: [0, 72, 85],     platformRadius: 10.5, coin: [60, 30, -30],   obstacles: 14, maxHeight: 55,  seed: 202,
+  { name: "Le Monde de Glace",   theme: "ice",    fuel: 150, gravity: 9.81, spawn: [0, 72, 85],     platformRadius: 10.5, coin: [60, 30, -30],   obstacles: 14, maxHeight: 55,  seed: 202,
     types: { rock: 3, box: 1 } },
-  { name: "Champ clairsemé", fuel: 145, gravity: 9.81, spawn: [20, 78, 125],   platformRadius: 9.5, coin: [-70, 35, 40],    obstacles: 22, maxHeight: 62,  seed: 303,
+  { name: "Les Terres Mystiques", theme: "mystic", fuel: 145, gravity: 9.81, spawn: [20, 78, 125],  platformRadius: 9.5, coin: [-70, 35, 40],    obstacles: 22, maxHeight: 62,  seed: 303,
     types: { rock: 3, box: 1, crystal: 1 } },
-  { name: "Slalom rocheux",  fuel: 140, gravity: 9.81, spawn: [-30, 82, 155],  platformRadius: 9,   coin: [80, 40, -60],    obstacles: 30, maxHeight: 68,  seed: 404,
+  { name: "Le Grand Désert",     theme: "desert", fuel: 140, gravity: 9.81, spawn: [-30, 82, 155],  platformRadius: 9,   coin: [80, 40, -60],    obstacles: 30, maxHeight: 68,  seed: 404,
     types: { rock: 3, box: 1, crystal: 1, ring: 1 } },
-  { name: "La ceinture",     fuel: 135, gravity: 9.81, spawn: [40, 86, 185],   platformRadius: 8,   coin: [-90, 45, -60],   obstacles: 40, maxHeight: 74,  seed: 505,
+  { name: "La Fournaise",        theme: "volcano", fuel: 135, gravity: 9.81, spawn: [40, 86, 185],  platformRadius: 8,   coin: [-90, 45, -60],   obstacles: 40, maxHeight: 74,  seed: 505,
     types: { rock: 3, box: 1, crystal: 1.2, ring: 1, column: 0.8 } },
-  { name: "Passage étroit",  fuel: 130, gravity: 9.81, spawn: [0, 90, 215],    platformRadius: 7.5, coin: [100, 40, 80],    obstacles: 50, maxHeight: 80,  seed: 606,
+  { name: "L'Archipel",          theme: "ocean",  fuel: 130, gravity: 9.81, spawn: [0, 90, 215],    platformRadius: 7.5, coin: [100, 40, 80],    obstacles: 50, maxHeight: 80,  seed: 606,
     types: { rock: 2.5, box: 1, crystal: 1.2, ring: 1.2, column: 1 } },
-  { name: "Gravité lourde",  fuel: 140, gravity: 12.0, spawn: [-50, 92, 225],  platformRadius: 7,   coin: [90, 50, -90],    obstacles: 55, maxHeight: 82,  seed: 707,
+  { name: "Le Marais Toxique",   theme: "swamp",  fuel: 140, gravity: 12.0, spawn: [-50, 92, 225],  platformRadius: 7,   coin: [90, 50, -90],    obstacles: 55, maxHeight: 82,  seed: 707,
     types: { rock: 2.5, box: 1, crystal: 1.5, ring: 1.2, column: 1 } },
-  { name: "Mer de pierres",  fuel: 130, gravity: 9.81, spawn: [60, 96, 255],   platformRadius: 6.5, coin: [-110, 45, 90],   obstacles: 65, maxHeight: 88,  seed: 808,
+  { name: "La Nuit des Lucioles", theme: "night", fuel: 130, gravity: 9.81, spawn: [60, 96, 255],   platformRadius: 6.5, coin: [-110, 45, 90],   obstacles: 65, maxHeight: 88,  seed: 808,
     types: { rock: 2, box: 1, crystal: 1.5, ring: 1.5, column: 1.2 } },
-  { name: "Le gant",         fuel: 125, gravity: 9.81, spawn: [0, 102, 285],   platformRadius: 6,   coin: [120, 55, -100],  obstacles: 80, maxHeight: 94,  seed: 909,
+  { name: "Le Royaume Sucré",    theme: "candy",  fuel: 125, gravity: 9.81, spawn: [0, 102, 285],   platformRadius: 6,   coin: [120, 55, -100],  obstacles: 80, maxHeight: 94,  seed: 909,
     types: { rock: 2, box: 1, crystal: 1.5, ring: 1.5, column: 1.5 } },
-  { name: "L'aiguille",      fuel: 125, gravity: 12.0, spawn: [-70, 110, 305], platformRadius: 5,   coin: [130, 50, 120],   obstacles: 95, maxHeight: 100, seed: 1010,
+  { name: "La Planète X",        theme: "alien",  fuel: 125, gravity: 12.0, spawn: [-70, 110, 305], platformRadius: 5,   coin: [130, 50, 120],   obstacles: 95, maxHeight: 100, seed: 1010,
     types: { rock: 2, box: 1, crystal: 2, ring: 2, column: 1.5 } },
 ];
 
