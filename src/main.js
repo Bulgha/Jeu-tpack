@@ -751,13 +751,94 @@ const FEET_LOCAL = []; // position des pieds (repère fusée), trains déployés
 }
 
 // Anime les trains : coulissement vers le bas puis ouverture.
-function setLegPose(deploy) {
+function poseLegs(pivots, deploy) {
   const slide = Math.min(1, deploy / 0.45);
   const swing = Math.max(0, (deploy - 0.45) / 0.55);
-  for (const p of legPivots) {
+  for (const p of pivots) {
     p.position.y = LEG_HIDE_Y + (LEG_PIVOT_Y - LEG_HIDE_Y) * slide;
     p.rotation.z = LEG_ANGLE * swing;
   }
+}
+function setLegPose(deploy) {
+  poseLegs(legPivots, deploy);
+}
+
+/* ================== Records & fantôme du meilleur temps ================= */
+// La trajectoire de la meilleure course (position, orientation, trains) est
+// enregistrée à 10 Hz ; au rejeu, une fusée translucide la rejoue en direct.
+
+const RECORDS_KEY = "tpack-records";
+const GHOST_DT = 0.1; // s entre deux échantillons
+
+let records = {};
+try { records = JSON.parse(localStorage.getItem(RECORDS_KEY) || "{}"); } catch { records = {}; }
+
+let ghostMesh = null;
+let ghostLegPivots = [];
+let ghostFrames = [];   // fantôme du niveau courant
+let ghostDt = GHOST_DT;
+let recFrames = [];     // enregistrement de la course en cours
+let recNext = 0;
+
+function ensureGhostMesh() {
+  if (ghostMesh) return;
+  ghostMesh = rocketMesh.clone(true);
+  const gm = new THREE.MeshBasicMaterial({
+    color: 0x8fd8ff, transparent: true, opacity: 0.35, depthWrite: false,
+  });
+  const lights = [];
+  ghostMesh.traverse((o) => {
+    if (o.isLight) lights.push(o);
+    else if (o.name === "flame") o.visible = false;
+    else if (o.isMesh) o.material = gm;
+  });
+  lights.forEach((l) => l.parent.remove(l));
+  ghostLegPivots = ghostMesh.children.filter((c) => c.isGroup);
+  ghostMesh.visible = false;
+  scene.add(ghostMesh);
+}
+
+function loadGhost(i) {
+  ghostFrames = [];
+  ghostDt = GHOST_DT;
+  try {
+    const d = JSON.parse(localStorage.getItem(`tpack-ghost-${i}`) || "null");
+    if (d && Array.isArray(d.f)) { ghostFrames = d.f; ghostDt = d.dt || GHOST_DT; }
+  } catch { /* fantôme illisible : tant pis */ }
+  if (ghostFrames.length) ensureGhostMesh();
+  if (ghostMesh) ghostMesh.visible = false;
+}
+
+function recordFrame() {
+  if (recFrames.length >= 4000) return;
+  recFrames.push([
+    +pos.x.toFixed(2), +pos.y.toFixed(2), +pos.z.toFixed(2),
+    +quat.x.toFixed(3), +quat.y.toFixed(3), +quat.z.toFixed(3), +quat.w.toFixed(3),
+    +legsDeploy.toFixed(2),
+  ]);
+}
+
+const _gq1 = new THREE.Quaternion();
+const _gq2 = new THREE.Quaternion();
+
+// Rejoue le fantôme au fil du chrono du joueur
+function updateGhost() {
+  if (!ghostMesh || !ghostFrames.length) return;
+  if (state !== "flying" && state !== "ready") { ghostMesh.visible = false; return; }
+  const ft = (state === "ready" ? 0 : elapsed) / ghostDt;
+  const i0 = Math.floor(ft);
+  if (i0 >= ghostFrames.length - 1) { ghostMesh.visible = false; return; }
+  const a = ghostFrames[i0], b = ghostFrames[i0 + 1], u = ft - i0;
+  ghostMesh.visible = true;
+  ghostMesh.position.set(
+    a[0] + (b[0] - a[0]) * u,
+    a[1] + (b[1] - a[1]) * u,
+    a[2] + (b[2] - a[2]) * u
+  );
+  _gq1.set(a[3], a[4], a[5], a[6]);
+  _gq2.set(b[3], b[4], b[5], b[6]);
+  ghostMesh.quaternion.copy(_gq1.slerp(_gq2, u));
+  poseLegs(ghostLegPivots, a[7] + (b[7] - a[7]) * u);
 }
 
 // Flamme du moteur
@@ -768,6 +849,7 @@ const flame = new THREE.Mesh(
 flame.rotation.x = Math.PI;
 flame.position.y = -3.7;
 flame.visible = false;
+flame.name = "flame";
 rocketMesh.add(flame);
 
 const flameCore = new THREE.Mesh(
@@ -777,6 +859,7 @@ const flameCore = new THREE.Mesh(
 flameCore.rotation.x = Math.PI;
 flameCore.position.y = -3.2;
 flameCore.visible = false;
+flameCore.name = "flame";
 rocketMesh.add(flameCore);
 
 const flameLight = new THREE.PointLight(0xff9a3d, 0, 30);
@@ -1212,7 +1295,7 @@ function rebuildLevelGrid() {
   LEVELS.forEach((lv, i) => {
     const b = document.createElement("button");
     b.textContent = i + 1;
-    b.title = lv.name;
+    b.title = lv.name + (records[i] !== undefined ? ` — record : ${records[i].toFixed(1)} s` : "");
     if (i + 1 > unlocked) b.disabled = true;
     if (i + 1 < unlocked) b.classList.add("done");
     b.addEventListener("click", () => startLevel(i));
@@ -1232,6 +1315,9 @@ function startLevel(i) {
   setBeacon(false);
   eggsThisRun.clear();
   clearDebris();
+  loadGhost(i);
+  recFrames = [];
+  recNext = 0;
 
   pos.set(...cfg.spawn);
   vel.set(0, 0, 0);
@@ -1270,7 +1356,10 @@ function startLevel(i) {
       (cfg.gravity > 10 ? " ⚠️ Gravité renforcée !" : "") +
       (cfg.timeLimit ? `\n⏱ LIMITE DE TEMPS : ${cfg.timeLimit} secondes !` : "") +
       `\n${coinTxt}` +
-      `\n2) Posez les 4 pieds sur la plateforme et restez stable ${STABLE_TIME} s — sans basculer !`,
+      `\n2) Posez les 4 pieds sur la plateforme et restez stable ${STABLE_TIME} s — sans basculer !` +
+      (records[i] !== undefined
+        ? `\n🏁 Record à battre : ${records[i].toFixed(1)} s — son fantôme vole avec vous !`
+        : ""),
     [["Décoller 🚀", beginFlight]]
   );
 }
@@ -1310,8 +1399,23 @@ function landSuccess() {
     localStorage.setItem(STORAGE_KEY, String(unlocked));
   }
 
-  const stats = `Carburant restant : ${Math.round(fuel)} u · Temps : ${elapsed.toFixed(1)} s` +
-    (cfg.timeLimit ? ` (${(cfg.timeLimit - elapsed).toFixed(1)} s d'avance !)` : "");
+  // Record du niveau + fantôme de la meilleure course
+  recordFrame();
+  const prevRecord = records[levelIndex];
+  const newRecord = prevRecord === undefined || elapsed < prevRecord;
+  if (newRecord) {
+    records[levelIndex] = +elapsed.toFixed(2);
+    try {
+      localStorage.setItem(RECORDS_KEY, JSON.stringify(records));
+      localStorage.setItem(`tpack-ghost-${levelIndex}`, JSON.stringify({ dt: GHOST_DT, f: recFrames }));
+    } catch { /* stockage plein : le record vivra le temps de la session */ }
+  }
+  const recTxt = newRecord
+    ? (prevRecord !== undefined ? `🏁 NOUVEAU RECORD ! (ancien : ${prevRecord.toFixed(1)} s)` : "🏁 NOUVEAU RECORD !")
+    : `Record : ${prevRecord.toFixed(1)} s`;
+
+  const stats = `Temps : ${elapsed.toFixed(1)} s — ${recTxt}\nCarburant restant : ${Math.round(fuel)} u` +
+    (cfg.timeLimit ? ` · ${(cfg.timeLimit - elapsed).toFixed(1)} s d'avance sur la limite` : "");
   if (levelIndex === LEVELS.length - 1) {
     showOverlay("🏆 Défi ultime accompli !", `${cfg.name} n'a pas résisté : les ${LEVELS.length} niveaux sont maîtrisés. Chapeau bas, pilote !\n${stats}`,
       [["Rejouer ce niveau", () => startLevel(levelIndex)], ["Menu", showMenu]]);
@@ -1487,6 +1591,12 @@ function physicsStep(dt) {
 
   rocketMesh.position.copy(pos);
   rocketMesh.quaternion.copy(quat);
+
+  // --- Enregistrement de la course (pour le fantôme du record) ---
+  if (elapsed >= recNext) {
+    recNext += GHOST_DT;
+    recordFrame();
+  }
 
   // --- Premier contact trop violent : la structure casse ---
   if (newContact && vyBefore < -IMPACT_MAX) {
@@ -1741,6 +1851,7 @@ function animate() {
   const dt = Math.min(clock.getDelta(), 1 / 20);
 
   if (state === "flying") physicsStep(dt);
+  updateGhost();
   updateDebris(dt);
   updateEggAnims(dt);
   if (waterTex) { // l'eau dérive doucement
@@ -1769,6 +1880,8 @@ function animate() {
   GAME.piecesNeeded = piecesNeeded;
   GAME.zoom = camZoom;
   GAME.elapsed = elapsed;
+  GAME.ghostVisible = !!(ghostMesh && ghostMesh.visible);
+  GAME.ghostFrames = ghostFrames.length;
 
   renderer.render(scene, camera);
 }
@@ -1777,6 +1890,7 @@ function animate() {
 const GAME = {
   state, fuel, level: 1, pos, vel, quat, angVel, camDir, coinPos, startLevel, beginFlight, showMenu,
   legs: 0, feetOn: 0, stableT: 0, piece: false, piecesGot: 0, piecesNeeded: 1, zoom: 1, elapsed: 0,
+  ghostVisible: false, ghostFrames: 0, records,
   eggPositions: () => EGGS.map((e) => e.obj()?.position),
   coinPositions: () => coinsState.map((c) => c.pos),
   givePiece() { for (const c of coinsState) if (!c.collected) collectPiece(c); },

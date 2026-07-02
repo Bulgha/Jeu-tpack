@@ -76,6 +76,11 @@ Le jeu est aussi directement hébergeable sur GitHub Pages (aucun build).
   sol** — il reste donc un instant pour la rattraper au moteur !
 - Toucher un obstacle, piquer du nez dans le sol, ou taper la
   plateforme à plus de **12 m/s** = 💥 crash.
+- ⏱ **Chaque niveau est chronométré** (limite affichée en haut de
+  l'écran ; dépassée = autodestruction). Le **record** de chaque niveau
+  est sauvegardé, et le **fantôme** de votre meilleure course — façon
+  Mario Kart — rejoue sa trajectoire à vos côtés quand vous retentez le
+  niveau.
 - 🥚 On raconte que **3 secrets** se cachent quelque part dans la
   carte… ouvrez l'œil en explorant, ils valent le détour.
 - Le réservoir est plein au départ de chaque niveau, mais de plus en plus
