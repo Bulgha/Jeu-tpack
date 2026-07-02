@@ -50,6 +50,7 @@ Le jeu est aussi directement hébergeable sur GitHub Pages (aucun build).
 | **Page ↑ / Page ↓** | Lacet (rotation sur l'axe vertical) |
 | **Espace** (maintenu) | Propulsion |
 | **+ / −** | Régler la puissance de poussée (10 % – 100 %) |
+| **Molette / pavé tactile** | Zoomer / dézoomer la caméra |
 | **R** | Recommencer le niveau |
 | **P** | Pause |
 | **Échap** | Retour au menu |
@@ -96,6 +97,7 @@ Le jeu est aussi directement hébergeable sur GitHub Pages (aucun build).
 | 8 | La Nuit des Lucioles | Nuit étoilée, pleine lune, lucioles |
 | 9 | Le Royaume Sucré | Tout rose, sucettes géantes, lagons menthe |
 | 10 | La Planète X | Ciel noir, planète annelée, flèches aliens — ⚠️ gravité 12 m/s² |
+| 11 | **L'Épreuve Extrême** | Monde d'orage — ⏱ **90 s chrono**, **3 pièces** à collecter, 120 obstacles |
 
 ## 🗂 Structure du projet
 

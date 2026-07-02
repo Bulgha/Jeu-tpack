@@ -93,6 +93,14 @@ html, body {
 }
 #hud-level { font-weight: 700; font-size: 1.1rem; }
 #hud-name { color: #aab4d0; font-style: italic; }
+#hud-timer {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #ffd24a;
+  font-variant-numeric: tabular-nums;
+}
+#hud-timer.low { color: #ff5252; animation: timer-blink 0.6s step-end infinite; }
+@keyframes timer-blink { 50% { opacity: 0.35; } }
 
 #hud-left {
   position: absolute; left: 16px; bottom: 16px;

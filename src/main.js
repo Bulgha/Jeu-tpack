@@ -187,6 +187,17 @@ const THEMES = {
     rock: [0.04, 0.05, 0.25, 0.15, 0.3, 0.15],
     stars: true, planet: true,
   },
+  storm: { // le monde de l'Épreuve Extrême
+    sky: [[0, "#14181f"], [0.5, "#2a3340"], [0.8, "#4d5a68"], [1, "#6a7885"]],
+    fog: [0x46525e, 210, 1150],
+    hemi: [0x8fa3b8, 0x1c2420, 0.5], sun: [0xc8d8e8, 0.85], amb: [0x9ab0c0, 0.14],
+    ground: { c: 0x2e3a34, rough: 1, metal: 0 },
+    pools: { n: 10, c: 0x22303e, rough: 0.1, metal: 0.5 },
+    flora: { type: "deadtree", n: 320 },
+    hills: { shape: "cone", n: 14, hsl: [0.58, 0.1, 0.16] },
+    rock: [0.58, 0.06, 0.1, 0.1, 0.2, 0.12],
+    particles: { c: 0x9ab0c0, n: 600, h: 80 }, // pluie en suspension
+  },
 };
 
 /* --------------------- Relief léger du terrain -------------------------- */
@@ -203,6 +214,7 @@ const TERRAIN = {
   night:   { a: 8,   d: 0 },
   candy:   { a: 12,  d: 4 },   // collines de guimauve
   alien:   { a: 14,  d: 5 },
+  storm:   { a: 13,  d: 4 },
 };
 const FLAT_PAD = 34; // rayon aplati autour de la plateforme
 const FLAT_EGGS = [{ x: 140, z: -95, r: 14 }, { x: -180, z: 120, r: 12 }, { x: 200, z: -160, r: 14 }];
@@ -917,54 +929,68 @@ function clearDebris() {
   if (flashLight) { scene.remove(flashLight); flashLight = null; }
 }
 
-/* ========================= Pièce à récupérer =========================== */
+/* ======================= Pièces à récupérer ============================= */
+// Un niveau peut demander une ou plusieurs pièces (cfg.coin ou cfg.coins).
+// Les trains d'atterrissage ne s'arment que lorsqu'elles sont TOUTES à bord.
 
-let coinGroup = null;   // groupe complet (pièce + balise)
-let coinSpin = null;    // partie tournante
-const coinPos = new THREE.Vector3();
-let pieceCollected = false;
+let coinsState = [];    // { pos, group, spin, collected }
+let piecesNeeded = 1;
+let piecesGot = 0;
+const coinPos = new THREE.Vector3(); // première pièce (debug/tests)
 
-function buildCoin(cfg) {
-  if (coinGroup) { scene.remove(coinGroup); disposeGroup(coinGroup); }
-  coinGroup = new THREE.Group();
-  coinPos.set(...cfg.coin);
+const allPieces = () => piecesGot >= piecesNeeded;
 
-  const gold = new THREE.MeshStandardMaterial({
-    color: 0xffd24a, metalness: 0.85, roughness: 0.25,
-    emissive: 0xaa7700, emissiveIntensity: 0.4,
-  });
-  coinSpin = new THREE.Group();
-  const disc = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 0.35, 26), gold);
-  disc.rotation.z = Math.PI / 2; // debout, comme une pièce
-  coinSpin.add(disc);
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(2.2, 0.22, 10, 26), gold);
-  coinSpin.add(rim);
-  const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.9, 0), gold);
-  coinSpin.add(star);
-  coinGroup.add(coinSpin);
+function buildCoins(cfg) {
+  for (const c of coinsState) { scene.remove(c.group); disposeGroup(c.group); }
+  coinsState = [];
+  const list = cfg.coins || [cfg.coin];
+  piecesNeeded = list.length;
+  piecesGot = 0;
 
-  // Balise dorée jusqu'au sol pour repérer la pièce de loin
-  const beam = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.45, 0.45, 80, 10, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0xffd24a, transparent: true, opacity: 0.16, depthWrite: false })
-  );
-  beam.position.y = -cfg.coin[1] + 40;
-  coinGroup.add(beam);
+  for (const p of list) {
+    const group = new THREE.Group();
+    const gold = new THREE.MeshStandardMaterial({
+      color: 0xffd24a, metalness: 0.85, roughness: 0.25,
+      emissive: 0xaa7700, emissiveIntensity: 0.4,
+    });
+    const spin = new THREE.Group();
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 0.35, 26), gold);
+    disc.rotation.z = Math.PI / 2; // debout, comme une pièce
+    spin.add(disc);
+    spin.add(new THREE.Mesh(new THREE.TorusGeometry(2.2, 0.22, 10, 26), gold));
+    spin.add(new THREE.Mesh(new THREE.OctahedronGeometry(0.9, 0), gold));
+    group.add(spin);
 
-  const light = new THREE.PointLight(0xffd24a, 25, 35);
-  coinGroup.add(light);
+    // Balise dorée jusqu'au sol pour repérer la pièce de loin
+    const beam = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.45, 0.45, 80, 10, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xffd24a, transparent: true, opacity: 0.16, depthWrite: false })
+    );
+    beam.position.y = -p[1] + 40;
+    group.add(beam);
+    group.add(new THREE.PointLight(0xffd24a, 25, 35));
 
-  coinGroup.position.copy(coinPos);
-  scene.add(coinGroup);
+    group.position.set(...p);
+    scene.add(group);
+    coinsState.push({ pos: new THREE.Vector3(...p), group, spin, collected: false });
+  }
+  coinPos.copy(coinsState[0].pos);
 }
 
-function collectPiece() {
-  pieceCollected = true;
-  coinGroup.visible = false;
-  setBeacon(true);
-  spawnDebris(coinPos, confettiMats, false);
+function collectPiece(c) {
+  c.collected = true;
+  c.group.visible = false;
+  piecesGot++;
+  spawnDebris(c.pos, confettiMats, false);
   audioCoin();
-  showToast("⭐ Pièce récupérée ! Trains d'atterrissage armés — cap sur la plateforme.");
+  if (allPieces()) {
+    setBeacon(true);
+    showToast(piecesNeeded > 1
+      ? "⭐ Toutes les pièces ! Trains armés — cap sur la plateforme."
+      : "⭐ Pièce récupérée ! Trains d'atterrissage armés — cap sur la plateforme.");
+  } else {
+    showToast(`⭐ Pièce ${piecesGot}/${piecesNeeded} — encore ${piecesNeeded - piecesGot} !`);
+  }
 }
 
 /* ====================== Toast & secrets cachés ========================== */
@@ -1135,7 +1161,7 @@ let feetOn = 0;            // pieds en contact avec la plateforme
 let wasContact = false;    // un pied touchait déjà au pas précédent
 
 let unlocked = parseInt(localStorage.getItem(STORAGE_KEY) || "1", 10);
-if (!(unlocked >= 1 && unlocked <= 10)) unlocked = 1;
+if (!(unlocked >= 1 && unlocked <= LEVELS.length)) unlocked = Math.min(Math.max(unlocked, 1), LEVELS.length) || 1;
 
 const input = { pitchUp: false, pitchDown: false, rollL: false, rollR: false, yawL: false, yawR: false, thrust: false };
 
@@ -1173,8 +1199,7 @@ function startLevel(i) {
   buildEnvironment(cfg.theme);
   buildPlatform(cfg.platformRadius);
   buildObstacleField(cfg);
-  buildCoin(cfg);
-  pieceCollected = false;
+  buildCoins(cfg);
   setBeacon(false);
   eggsThisRun.clear();
   clearDebris();
@@ -1201,17 +1226,21 @@ function startLevel(i) {
 
   menuEl.classList.add("hidden");
   hudEl.classList.remove("hidden");
-  $("hud-level").textContent = `Niveau ${i + 1}/10`;
+  $("hud-level").textContent = `Niveau ${i + 1}/${LEVELS.length}`;
   $("hud-name").textContent = cfg.name;
+  $("hud-timer").classList.toggle("hidden", !cfg.timeLimit);
 
   state = "ready";
   const dist = Math.round(Math.hypot(cfg.spawn[0], cfg.spawn[2]));
-  const coinDist = Math.round(Math.hypot(cfg.coin[0], cfg.coin[2]));
+  const coinTxt = piecesNeeded > 1
+    ? `1) Récupérez les ${piecesNeeded} pièces ⭐ (balises dorées) : sans elles, les trains restent verrouillés.`
+    : `1) Récupérez la pièce ⭐ (balise dorée, à ${Math.round(Math.hypot(cfg.coin[0], cfg.coin[2]))} m de la plateforme) : sans elle, les trains restent verrouillés.`;
   showOverlay(
     `Niveau ${i + 1} — ${cfg.name}`,
     `Plateforme à ${dist} m (rayon ${cfg.platformRadius} m). Carburant : ${cfg.fuel} unités.` +
       (cfg.gravity > 10 ? " ⚠️ Gravité renforcée !" : "") +
-      `\n1) Récupérez la pièce ⭐ (balise dorée, à ${coinDist} m de la plateforme) : sans elle, les trains restent verrouillés.` +
+      (cfg.timeLimit ? `\n⏱ LIMITE DE TEMPS : ${cfg.timeLimit} secondes !` : "") +
+      `\n${coinTxt}` +
       `\n2) Posez les 4 pieds sur la plateforme et restez stable ${STABLE_TIME} s — sans basculer !`,
     [["Décoller 🚀", beginFlight]]
   );
@@ -1248,13 +1277,14 @@ function landSuccess() {
   audioSuccess();
 
   if (levelIndex + 2 > unlocked) {
-    unlocked = Math.min(levelIndex + 2, 10);
+    unlocked = Math.min(levelIndex + 2, LEVELS.length);
     localStorage.setItem(STORAGE_KEY, String(unlocked));
   }
 
-  const stats = `Carburant restant : ${Math.round(fuel)} u · Temps : ${elapsed.toFixed(1)} s`;
-  if (levelIndex === 9) {
-    showOverlay("🏆 Jeu terminé !", `Vous avez maîtrisé les 10 niveaux. Bravo, pilote !\n${stats}`,
+  const stats = `Carburant restant : ${Math.round(fuel)} u · Temps : ${elapsed.toFixed(1)} s` +
+    (cfg.timeLimit ? ` (${(cfg.timeLimit - elapsed).toFixed(1)} s d'avance !)` : "");
+  if (levelIndex === LEVELS.length - 1) {
+    showOverlay("🏆 L'Épreuve Extrême est vaincue !", `Les ${LEVELS.length} niveaux sont maîtrisés. Chapeau bas, pilote !\n${stats}`,
       [["Rejouer ce niveau", () => startLevel(levelIndex)], ["Menu", showMenu]]);
   } else {
     showOverlay("🎉 Atterrissage réussi !", stats, [
@@ -1307,6 +1337,12 @@ function surfaceYAt(x, z) {
 function physicsStep(dt) {
   elapsed += dt;
 
+  // --- Limite de temps (niveau extrême) ---
+  if (cfg.timeLimit && elapsed >= cfg.timeLimit) {
+    crash("⏱ Temps écoulé ! La fusée s'est autodétruite.");
+    return;
+  }
+
   // --- Rotation (commandes relatives à l'écran : « ↑ » incline toujours la
   // fusée vers le fond de l'écran, même quand la caméra tourne autour de la
   // plateforme — pas d'inversion des commandes) ---
@@ -1328,8 +1364,8 @@ function physicsStep(dt) {
   const hDistNow = Math.hypot(pos.x, pos.z);
   const altPad = pos.y - PLATFORM_TOP;
   if (!wasContact) {
-    if (pieceCollected && hDistNow < cfg.platformRadius + 25 && altPad < 45) legsTriggered = true;
-    else if (!pieceCollected || hDistNow > cfg.platformRadius + 35 || altPad > 55) legsTriggered = false;
+    if (allPieces() && hDistNow < cfg.platformRadius + 25 && altPad < 45) legsTriggered = true;
+    else if (!allPieces() || hDistNow > cfg.platformRadius + 35 || altPad > 55) legsTriggered = false;
   }
   const legStep = dt / LEG_DEPLOY_T;
   legsDeploy += THREE.MathUtils.clamp((legsTriggered ? 1 : 0) - legsDeploy, -legStep, legStep);
@@ -1432,8 +1468,10 @@ function physicsStep(dt) {
   checkCollisions();
   if (state !== "flying") return;
 
-  // --- Pièce à récupérer & secrets cachés ---
-  if (!pieceCollected && pos.distanceToSquared(coinPos) < 5.5 * 5.5) collectPiece();
+  // --- Pièces à récupérer & secrets cachés ---
+  for (const c of coinsState) {
+    if (!c.collected && pos.distanceToSquared(c.pos) < 5.5 * 5.5) collectPiece(c);
+  }
   checkEggs();
 
   // --- Stabilisation : 4 pieds posés + immobilité pendant STABLE_TIME ---
@@ -1505,6 +1543,13 @@ function checkCollisions() {
 const camDir = new THREE.Vector3(0, 0, 1);
 const _camTarget = new THREE.Vector3();
 const _desired = new THREE.Vector3();
+let camZoom = 1; // molette / pavé tactile : 0.45 (près) … 2.5 (loin)
+
+window.addEventListener("wheel", (e) => {
+  if (state === "menu") return;
+  e.preventDefault();
+  camZoom = THREE.MathUtils.clamp(camZoom * Math.exp(e.deltaY * 0.0012), 0.45, 2.5);
+}, { passive: false });
 
 function updateCamera(dt, snap = false) {
   _desired.set(pos.x, 0, pos.z);
@@ -1520,8 +1565,8 @@ function updateCamera(dt, snap = false) {
   if (snap) camDir.copy(_desired);
   else camDir.lerp(_desired, 1 - Math.exp(-1.6 * dt)).normalize();
 
-  _camTarget.copy(pos).addScaledVector(camDir, 26);
-  _camTarget.y = pos.y + 11;
+  _camTarget.copy(pos).addScaledVector(camDir, 26 * camZoom);
+  _camTarget.y = pos.y + 11 * camZoom;
   const camFloor = Math.max(3, terrainH(_camTarget.x, _camTarget.z) + 4);
   if (_camTarget.y < camFloor) _camTarget.y = camFloor;
 
@@ -1569,23 +1614,35 @@ function updateHUD() {
 
   setStat("stat-dist", `${Math.round(hDist)} m`);
 
-  setStat("stat-legs", legsDeploy >= 0.95 ? "Sortis" : legsDeploy > 0.02 ? "Manœuvre…" : pieceCollected ? "Repliés" : "Verrouillés 🔒",
+  setStat("stat-legs", legsDeploy >= 0.95 ? "Sortis" : legsDeploy > 0.02 ? "Manœuvre…" : allPieces() ? "Repliés" : "Verrouillés 🔒",
     legsDeploy >= 0.95 ? true : undefined);
 
-  setStat("stat-piece", pieceCollected ? "Ramassée ✓" : "À récupérer ⭐", pieceCollected);
+  setStat("stat-piece",
+    piecesNeeded > 1 ? `${piecesGot} / ${piecesNeeded} ⭐` : allPieces() ? "Ramassée ✓" : "À récupérer ⭐",
+    allPieces());
 
-  // Compteur de stabilisation / avertissement pièce manquante
+  // Chrono du niveau extrême
+  if (cfg.timeLimit) {
+    const left = Math.max(0, cfg.timeLimit - elapsed);
+    const timer = $("hud-timer");
+    timer.textContent = `⏱ ${left.toFixed(1)} s`;
+    timer.classList.toggle("low", left < 15 && state === "flying");
+  }
+
+  // Compteur de stabilisation / avertissement pièces manquantes
   const stab = $("stab");
   if (state === "flying" && feetOn === 4) {
     stab.classList.remove("hidden", "warn");
     stab.textContent = stableT > 0
       ? `Stabilisation… ${Math.min(stableT, STABLE_TIME).toFixed(1)} / ${STABLE_TIME.toFixed(1)} s`
       : "Stabilisez la fusée !";
-  } else if (state === "flying" && !pieceCollected &&
+  } else if (state === "flying" && !allPieces() &&
              hDist < cfg.platformRadius + 25 && pos.y - PLATFORM_TOP < 45) {
     stab.classList.remove("hidden");
     stab.classList.add("warn");
-    stab.textContent = "🔒 Trains verrouillés — récupérez d'abord la pièce ⭐ !";
+    stab.textContent = piecesNeeded > 1
+      ? `🔒 Trains verrouillés — il manque ${piecesNeeded - piecesGot} pièce(s) ⭐ !`
+      : "🔒 Trains verrouillés — récupérez d'abord la pièce ⭐ !";
   } else {
     stab.classList.add("hidden");
   }
@@ -1619,7 +1676,7 @@ window.addEventListener("keydown", (e) => {
   } else if (e.code === "KeyP") {
     togglePause();
   } else if (e.code === "KeyN") {
-    if (state === "landed" && levelIndex < 9) startLevel(levelIndex + 1);
+    if (state === "landed" && levelIndex < LEVELS.length - 1) startLevel(levelIndex + 1);
   } else if (e.code === "Escape") {
     if (state !== "menu") showMenu();
   }
@@ -1661,10 +1718,11 @@ function animate() {
     waterTex.offset.x += dt * 0.012;
     waterTex.offset.y += dt * 0.007;
   }
-  if (coinGroup && coinGroup.visible && coinSpin) {
-    coinSpin.rotation.y += 2.2 * dt;
-    coinSpin.position.y = Math.sin(performance.now() / 400) * 0.6;
-  }
+  coinsState.forEach((c, k) => {
+    if (c.collected) return;
+    c.spin.rotation.y += 2.2 * dt;
+    c.spin.position.y = Math.sin(performance.now() / 400 + k * 2.1) * 0.6;
+  });
   if (state !== "menu") {
     updateCamera(dt);
     updateHUD();
@@ -1677,7 +1735,11 @@ function animate() {
   GAME.legs = legsDeploy;
   GAME.feetOn = feetOn;
   GAME.stableT = stableT;
-  GAME.piece = pieceCollected;
+  GAME.piece = allPieces();
+  GAME.piecesGot = piecesGot;
+  GAME.piecesNeeded = piecesNeeded;
+  GAME.zoom = camZoom;
+  GAME.elapsed = elapsed;
 
   renderer.render(scene, camera);
 }
@@ -1685,10 +1747,12 @@ function animate() {
 // Exposé pour le débogage et les tests automatisés
 const GAME = {
   state, fuel, level: 1, pos, vel, quat, angVel, camDir, coinPos, startLevel, beginFlight, showMenu,
-  legs: 0, feetOn: 0, stableT: 0, piece: false,
+  legs: 0, feetOn: 0, stableT: 0, piece: false, piecesGot: 0, piecesNeeded: 1, zoom: 1, elapsed: 0,
   eggPositions: () => EGGS.map((e) => e.obj()?.position),
-  givePiece() { if (!pieceCollected) collectPiece(); },
-  deployLegs() { if (!pieceCollected) collectPiece(); legsTriggered = true; legsDeploy = 1; },
+  coinPositions: () => coinsState.map((c) => c.pos),
+  givePiece() { for (const c of coinsState) if (!c.collected) collectPiece(c); },
+  deployLegs() { this.givePiece(); legsTriggered = true; legsDeploy = 1; },
+  warpTime(s) { elapsed = s; },
 };
 window.GAME = GAME;
 

@@ -36,6 +36,11 @@ export const LEVELS = [
     types: { rock: 2, box: 1, crystal: 1.5, ring: 1.5, column: 1.5 } },
   { name: "La Planète X",        theme: "alien",  fuel: 125, gravity: 12.0, spawn: [-70, 110, 305], platformRadius: 5,   coin: [130, 50, 120],   obstacles: 95, maxHeight: 100, seed: 1010,
     types: { rock: 2, box: 1, crystal: 2, ring: 2, column: 1.5 } },
+  // Le niveau extrême : 3 pièces, limite de temps, déluge d'obstacles
+  { name: "L'Épreuve Extrême",   theme: "storm",  fuel: 155, gravity: 9.81, spawn: [80, 105, 290],  platformRadius: 5,
+    coins: [[-120, 45, 60], [90, 55, -130], [140, 40, 150]], timeLimit: 90,
+    obstacles: 120, maxHeight: 100, seed: 1111,
+    types: { rock: 2, box: 1, crystal: 2, ring: 2, column: 1.8 } },
 ];
 
 // Générateur pseudo-aléatoire déterministe (mulberry32).
@@ -55,9 +60,9 @@ export function mulberry32(seed) {
 export function buildObstacles(cfg) {
   const rng = mulberry32(cfg.seed);
   const [sx, sy, sz] = cfg.spawn;
-  const [cx, cy, cz] = cfg.coin;
+  const coins = cfg.coins || [cfg.coin];
   const rMin = cfg.platformRadius + 16;
-  const rMax = Math.max(Math.hypot(sx, sz), Math.hypot(cx, cz)) + 30;
+  const rMax = Math.max(Math.hypot(sx, sz), ...coins.map((c) => Math.hypot(c[0], c[2]))) + 30;
 
   const kinds = Object.entries(cfg.types);
   const totalWeight = kinds.reduce((s, [, w]) => s + w, 0);
@@ -102,9 +107,9 @@ export function buildObstacles(cfg) {
     if (d < cfg.platformRadius + 14 && y < 42) continue;
     // Bulle de sécurité au départ…
     if (Math.hypot(x - sx, y - sy, z - sz) < 26) continue;
-    // …et autour de la pièce
-    if (Math.hypot(x - cx, y - cy, z - cz) < 18) continue;
-    if (kind === "column" && Math.hypot(x - cx, z - cz) < 16 && cy < h + 8) continue;
+    // …et autour de chaque pièce
+    if (coins.some((c) => Math.hypot(x - c[0], y - c[1], z - c[2]) < 18)) continue;
+    if (kind === "column" && coins.some((c) => Math.hypot(x - c[0], z - c[2]) < 16 && c[1] < h + 8)) continue;
 
     list.push({ kind, pos: [x, y, z], size, h, rot, hue: rng() });
   }
