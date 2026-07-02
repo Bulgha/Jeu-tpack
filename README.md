@@ -56,16 +56,17 @@ Le jeu est aussi directement hébergeable sur GitHub Pages (aucun build).
 
 ## 🏁 Règles
 
-- Les **trains d'atterrissage** (4 pieds) sortent automatiquement à
-  l'approche de la cible.
+- Les **trains d'atterrissage** (4 pieds) sont cachés dans le fuselage et
+  sortent automatiquement à l'approche de la cible : ils coulissent hors
+  du bas de la fusée puis s'écartent.
 - Le niveau est réussi quand les **4 pieds reposent sur la plateforme**
   et que la fusée reste **immobile pendant 2 secondes** — n'importe où
   sur le plateau.
-- Le vrai danger n'est plus d'arriver vite, mais de **basculer** : la
-  fusée a une vraie physique de contact (rebonds, glissade, couples).
-  Arrivez trop penché ou trop vite en latéral et elle versera. Le moteur
-  reste utilisable au sol pour rattraper un début de bascule.
-- Toucher un astéroïde, heurter le sol avec le corps, ou taper la
+- Les trains **amortissent et stabilisent** l'atterrissage : la fusée se
+  redresse toute seule si elle arrive un peu penchée ou un peu vite. Mais
+  au-delà d'un certain angle, elle bascule… et n'explose que **couchée au
+  sol** — il reste donc un instant pour la rattraper au moteur !
+- Toucher un astéroïde, piquer du nez dans le sol, ou taper la
   plateforme à plus de **12 m/s** = 💥 crash.
 - Le réservoir est plein au départ de chaque niveau, mais de plus en plus
   juste au fil des niveaux — gérez la poussée !

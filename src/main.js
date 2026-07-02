@@ -19,13 +19,18 @@ const PLATFORM_TOP = 2;     // hauteur du dessus de la plateforme
 // niveau est réussi quand les 4 pieds reposent sur la plateforme, immobiles
 // pendant STABLE_TIME. Le vrai danger : basculer sur le côté.
 const STABLE_TIME = 2;      // s d'immobilité requises sur la cible
-const TIP_ANGLE = 60;       // ° : au-delà, la fusée a basculé
+const BODY_TIP = 70;        // ° : couchée au-delà → explose au contact du sol
 const IMPACT_MAX = 12;      // m/s : impact vertical qui casse la structure
-const LEG_ANGLE = 0.7;      // rad : ouverture des trains déployés
-const LEG_PIVOT_Y = -1.85, LEG_PIVOT_R = 0.82, LEG_LEN = 1.95;
+const LEG_ANGLE = 0.95;     // rad : ouverture des trains déployés (assise large)
+const LEG_PIVOT_Y = -1.85, LEG_PIVOT_R = 0.5, LEG_LEN = 2.2;
+const LEG_HIDE_Y = 0.2;     // position du pivot trains rentrés (cachés dans le corps)
+const LEG_DEPLOY_T = 1.1;   // s : durée de la sortie des trains
 const CONTACT_K = 300;      // raideur du contact pied/sol
 const CONTACT_C = 30;       // amortissement du contact
-const FRICTION = 0.65;      // frottement des pieds
+const FRICTION = 0.45;      // frottement des pieds (bas : on glisse au lieu de verser)
+const RIGHT_K = 10;         // couple de redressement des trains au contact
+const RIGHT_FADE = [0.55, 0.32]; // rad : le redressement s'estompe de ~31° à ~50°
+const CONTACT_DAMP = 6;     // amortissement angulaire supplémentaire au contact
 const INERTIA = 4;          // inertie en rotation (masse = 1)
 const PHYS_H = 1 / 240;     // sous-pas d'intégration des contacts
 const HINT_V = 8, HINT_H = 6, HINT_TILT = 25; // seuils indicatifs du HUD
@@ -239,18 +244,19 @@ const rocketMesh = new THREE.Group();
   rocketMesh.add(nozzle);
 }
 
-// Trains d'atterrissage : 4 jambes articulées, repliées le long du corps,
-// déployées automatiquement à l'approche de la cible.
+// Trains d'atterrissage : 4 jambes cachées à l'intérieur du fuselage. À
+// l'approche de la cible, elles coulissent hors du bas de la fusée (phase 1)
+// puis s'écartent en position d'atterrissage (phase 2).
 const legPivots = [];
 const FEET_LOCAL = []; // position des pieds (repère fusée), trains déployés
 {
   const legMat = new THREE.MeshStandardMaterial({ color: 0x2c2f38, roughness: 0.5, metalness: 0.6 });
   const strutGeo = new THREE.CylinderGeometry(0.07, 0.09, LEG_LEN, 8);
-  const footGeo = new THREE.CylinderGeometry(0.3, 0.34, 0.14, 10);
+  const footGeo = new THREE.CylinderGeometry(0.26, 0.3, 0.14, 10);
   for (let i = 0; i < 4; i++) {
     const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
     const pivot = new THREE.Group();
-    pivot.position.set(Math.cos(a) * LEG_PIVOT_R, LEG_PIVOT_Y, Math.sin(a) * LEG_PIVOT_R);
+    pivot.position.set(Math.cos(a) * LEG_PIVOT_R, LEG_HIDE_Y, Math.sin(a) * LEG_PIVOT_R);
     pivot.rotation.y = -a; // le X local du pivot pointe vers l'extérieur
     const strut = new THREE.Mesh(strutGeo, legMat);
     strut.position.y = -LEG_LEN / 2;
@@ -266,6 +272,16 @@ const FEET_LOCAL = []; // position des pieds (repère fusée), trains déployés
       LEG_PIVOT_Y - LEG_LEN * Math.cos(LEG_ANGLE),
       (LEG_PIVOT_R + LEG_LEN * Math.sin(LEG_ANGLE)) * Math.sin(a)
     ));
+  }
+}
+
+// Anime les trains : coulissement vers le bas puis ouverture.
+function setLegPose(deploy) {
+  const slide = Math.min(1, deploy / 0.45);
+  const swing = Math.max(0, (deploy - 0.45) / 0.55);
+  for (const p of legPivots) {
+    p.position.y = LEG_HIDE_Y + (LEG_PIVOT_Y - LEG_HIDE_Y) * slide;
+    p.rotation.z = LEG_ANGLE * swing;
   }
 }
 
@@ -516,7 +532,7 @@ function startLevel(i) {
   grassT = 0;
   feetOn = 0;
   wasContact = false;
-  legPivots.forEach((p) => (p.rotation.z = 0));
+  setLegPose(0);
   rocketMesh.visible = true;
   rocketMesh.position.copy(pos);
   rocketMesh.quaternion.copy(quat);
@@ -648,8 +664,8 @@ function physicsStep(dt) {
   // --- Trains d'atterrissage : sortie automatique près de la cible ---
   const hDistNow = Math.hypot(pos.x, pos.z);
   if (hDistNow < cfg.platformRadius + 40 && pos.y - PLATFORM_TOP < 45) legsTriggered = true;
-  if (legsTriggered && legsDeploy < 1) legsDeploy = Math.min(1, legsDeploy + dt / 0.8);
-  legPivots.forEach((p) => (p.rotation.z = LEG_ANGLE * legsDeploy));
+  if (legsTriggered && legsDeploy < 1) legsDeploy = Math.min(1, legsDeploy + dt / LEG_DEPLOY_T);
+  setLegPose(legsDeploy);
   const legsOut = legsDeploy >= 0.95;
 
   // --- Poussée & carburant (au sol comme en vol : on peut se rattraper) ---
@@ -670,12 +686,14 @@ function physicsStep(dt) {
     vel.y -= cfg.gravity * h;
 
     if (legsOut) {
+      let touching = false;
       for (const fl of FEET_LOCAL) {
         _foot.copy(fl).applyQuaternion(quat).add(pos);
         const pen = surfaceYAt(_foot.x, _foot.z) - _foot.y;
         if (pen <= 0) continue;
         if (!wasContact) newContact = true;
         anyContact = true;
+        touching = true;
 
         _r.copy(_foot).sub(pos);                    // bras de levier
         _vp.copy(angVel).cross(_r).add(vel);        // vitesse du point de contact
@@ -693,6 +711,21 @@ function physicsStep(dt) {
         vel.addScaledVector(_F, h);
         _r.cross(_F);                               // couple = r × F
         angVel.addScaledVector(_r, h / INERTIA);
+      }
+
+      // Les trains stabilisent la fusée : couple de redressement (qui
+      // s'estompe aux grandes inclinaisons — trop penché, elle bascule) et
+      // amortissement des oscillations tant qu'un pied touche le sol.
+      if (touching) {
+        _up.set(0, 1, 0).applyQuaternion(quat);
+        _axis.crossVectors(_up, UP); // |axe| = sin(inclinaison)
+        const s = _axis.length();
+        if (s > 1e-4 && _up.y > 0.2) {
+          const tiltR = Math.asin(Math.min(s, 1));
+          const falloff = THREE.MathUtils.clamp(1 - (tiltR - RIGHT_FADE[0]) / RIGHT_FADE[1], 0, 1);
+          if (falloff > 0) angVel.addScaledVector(_axis.divideScalar(s), RIGHT_K * s * falloff * h);
+        }
+        angVel.multiplyScalar(Math.exp(-CONTACT_DAMP * h));
       }
     }
 
@@ -769,19 +802,18 @@ function checkCollisions() {
     }
   }
 
-  // Basculement : au-delà de TIP_ANGLE, la fusée est tombée
-  if (tiltDeg() > TIP_ANGLE) {
-    crash("La fusée a basculé sur le côté !");
-    return;
-  }
-
   // Corps de la fusée contre le sol ou la plateforme (nez, centre, moteur).
-  // Les pieds, eux, sont gérés par les contacts physiques.
+  // Les pieds, eux, sont gérés par les contacts physiques. Une fusée qui
+  // penche n'explose que couchée (quasi horizontale) au contact du sol.
+  const tilt = tiltDeg();
   for (const ly of [3.55, 0, -2.75]) {
     _p.set(0, ly, 0).applyQuaternion(quat).add(pos);
     const sy = surfaceYAt(_p.x, _p.z);
     if (_p.y < sy - 0.05) {
-      crash(ly > 0 ? "Le nez de la fusée a heurté le sol." : "La fusée s'est écrasée au sol.");
+      if (ly < 0 && tilt <= BODY_TIP) continue; // la tuyère peut frôler le sol
+      crash(tilt > BODY_TIP
+        ? "La fusée s'est couchée… et a explosé !"
+        : "Le nez de la fusée a heurté le sol.");
       return;
     }
     // Percuté le flanc de la plateforme
