@@ -1,27 +1,40 @@
-// Définition des 10 niveaux et génération déterministe des champs d'astéroïdes.
+// Définition des 10 niveaux et génération déterministe des champs d'obstacles.
 //
 // Chaque niveau précise :
 //   name           nom affiché
-//   fuel           carburant au départ (unités ; la poussée à fond brûle BURN_RATE u/s)
+//   fuel           carburant au départ (unités)
 //   gravity        gravité du niveau (m/s²)
 //   spawn          position de départ de la fusée [x, y, z]
 //   platformRadius rayon de la plateforme d'atterrissage (centrée à l'origine)
-//   asteroids      nombre d'astéroïdes sur le trajet
-//   corridor       demi-largeur (m) de la zone où les astéroïdes sont dispersés
-//   maxHeight      hauteur max des astéroïdes
+//   coin           position de la pièce à récupérer avant de pouvoir se poser
+//   obstacles      nombre d'obstacles, répartis TOUT AUTOUR de la cible
+//   maxHeight      hauteur max des obstacles flottants
+//   types          familles d'obstacles et leurs poids relatifs :
+//                  rock (rocher), box (bloc), crystal (cristal),
+//                  ring (anneau de pierre), column (pilier ancré au sol)
 //   seed           graine du générateur (champ identique à chaque partie)
 
 export const LEVELS = [
-  { name: "Premier envol",   fuel: 130, gravity: 9.81, spawn: [0, 70, 30],     platformRadius: 12,  asteroids: 0,  corridor: 0,  maxHeight: 0,  seed: 101 },
-  { name: "Dérive douce",    fuel: 115, gravity: 9.81, spawn: [0, 72, 85],     platformRadius: 10.5, asteroids: 7,  corridor: 30, maxHeight: 55, seed: 202 },
-  { name: "Champ clairsemé", fuel: 110, gravity: 9.81, spawn: [20, 78, 125],   platformRadius: 9.5, asteroids: 13, corridor: 34, maxHeight: 62, seed: 303 },
-  { name: "Slalom rocheux",  fuel: 105, gravity: 9.81, spawn: [-30, 82, 155],  platformRadius: 9,   asteroids: 20, corridor: 36, maxHeight: 68, seed: 404 },
-  { name: "La ceinture",     fuel: 100, gravity: 9.81, spawn: [40, 86, 185],   platformRadius: 8,   asteroids: 28, corridor: 38, maxHeight: 74, seed: 505 },
-  { name: "Passage étroit",  fuel: 95,  gravity: 9.81, spawn: [0, 90, 215],    platformRadius: 7.5, asteroids: 36, corridor: 30, maxHeight: 80, seed: 606 },
-  { name: "Gravité lourde",  fuel: 105, gravity: 12.0, spawn: [-50, 92, 225],  platformRadius: 7,   asteroids: 40, corridor: 38, maxHeight: 82, seed: 707 },
-  { name: "Mer de pierres",  fuel: 95,  gravity: 9.81, spawn: [60, 96, 255],   platformRadius: 6.5, asteroids: 50, corridor: 42, maxHeight: 88, seed: 808 },
-  { name: "Le gant",         fuel: 90,  gravity: 9.81, spawn: [0, 102, 285],   platformRadius: 6,   asteroids: 62, corridor: 32, maxHeight: 94, seed: 909 },
-  { name: "L'aiguille",      fuel: 90,  gravity: 12.0, spawn: [-70, 110, 305], platformRadius: 5,   asteroids: 74, corridor: 40, maxHeight: 100, seed: 1010 },
+  { name: "Premier envol",   fuel: 160, gravity: 9.81, spawn: [0, 70, 30],     platformRadius: 12,  coin: [0, 25, -50],     obstacles: 6,  maxHeight: 45,  seed: 101,
+    types: { rock: 1 } },
+  { name: "Dérive douce",    fuel: 150, gravity: 9.81, spawn: [0, 72, 85],     platformRadius: 10.5, coin: [60, 30, -30],   obstacles: 14, maxHeight: 55,  seed: 202,
+    types: { rock: 3, box: 1 } },
+  { name: "Champ clairsemé", fuel: 145, gravity: 9.81, spawn: [20, 78, 125],   platformRadius: 9.5, coin: [-70, 35, 40],    obstacles: 22, maxHeight: 62,  seed: 303,
+    types: { rock: 3, box: 1, crystal: 1 } },
+  { name: "Slalom rocheux",  fuel: 140, gravity: 9.81, spawn: [-30, 82, 155],  platformRadius: 9,   coin: [80, 40, -60],    obstacles: 30, maxHeight: 68,  seed: 404,
+    types: { rock: 3, box: 1, crystal: 1, ring: 1 } },
+  { name: "La ceinture",     fuel: 135, gravity: 9.81, spawn: [40, 86, 185],   platformRadius: 8,   coin: [-90, 45, -60],   obstacles: 40, maxHeight: 74,  seed: 505,
+    types: { rock: 3, box: 1, crystal: 1.2, ring: 1, column: 0.8 } },
+  { name: "Passage étroit",  fuel: 130, gravity: 9.81, spawn: [0, 90, 215],    platformRadius: 7.5, coin: [100, 40, 80],    obstacles: 50, maxHeight: 80,  seed: 606,
+    types: { rock: 2.5, box: 1, crystal: 1.2, ring: 1.2, column: 1 } },
+  { name: "Gravité lourde",  fuel: 140, gravity: 12.0, spawn: [-50, 92, 225],  platformRadius: 7,   coin: [90, 50, -90],    obstacles: 55, maxHeight: 82,  seed: 707,
+    types: { rock: 2.5, box: 1, crystal: 1.5, ring: 1.2, column: 1 } },
+  { name: "Mer de pierres",  fuel: 130, gravity: 9.81, spawn: [60, 96, 255],   platformRadius: 6.5, coin: [-110, 45, 90],   obstacles: 65, maxHeight: 88,  seed: 808,
+    types: { rock: 2, box: 1, crystal: 1.5, ring: 1.5, column: 1.2 } },
+  { name: "Le gant",         fuel: 125, gravity: 9.81, spawn: [0, 102, 285],   platformRadius: 6,   coin: [120, 55, -100],  obstacles: 80, maxHeight: 94,  seed: 909,
+    types: { rock: 2, box: 1, crystal: 1.5, ring: 1.5, column: 1.5 } },
+  { name: "L'aiguille",      fuel: 125, gravity: 12.0, spawn: [-70, 110, 305], platformRadius: 5,   coin: [130, 50, 120],   obstacles: 95, maxHeight: 100, seed: 1010,
+    types: { rock: 2, box: 1, crystal: 2, ring: 2, column: 1.5 } },
 ];
 
 // Générateur pseudo-aléatoire déterministe (mulberry32).
@@ -35,46 +48,64 @@ export function mulberry32(seed) {
   };
 }
 
-// Génère les astéroïdes d'un niveau : dispersés le long du couloir qui relie
-// le point de départ à la plateforme (à l'origine), en épargnant une zone de
-// sécurité autour du départ et au-dessus de la plateforme.
-export function buildAsteroids(cfg) {
+// Génère les obstacles d'un niveau, répartis dans un anneau complet autour
+// de la plateforme (360°), en épargnant trois bulles de sécurité : le départ,
+// la pièce à ramasser, et le ciel juste au-dessus de la plateforme.
+export function buildObstacles(cfg) {
   const rng = mulberry32(cfg.seed);
+  const [sx, sy, sz] = cfg.spawn;
+  const [cx, cy, cz] = cfg.coin;
+  const rMin = cfg.platformRadius + 16;
+  const rMax = Math.max(Math.hypot(sx, sz), Math.hypot(cx, cz)) + 30;
+
+  const kinds = Object.entries(cfg.types);
+  const totalWeight = kinds.reduce((s, [, w]) => s + w, 0);
+  const pickKind = () => {
+    let r = rng() * totalWeight;
+    for (const [k, w] of kinds) { r -= w; if (r <= 0) return k; }
+    return kinds[0][0];
+  };
+
   const list = [];
-  const [sx, , sz] = cfg.spawn;
-  const spawnDist = Math.hypot(sx, sz);
-
   let attempts = 0;
-  while (list.length < cfg.asteroids && attempts < cfg.asteroids * 40) {
+  while (list.length < cfg.obstacles && attempts < cfg.obstacles * 60) {
     attempts++;
+    const kind = pickKind();
+    const a = rng() * Math.PI * 2;
+    // Tirage uniforme en surface dans l'anneau [rMin, rMax]
+    const d = Math.sqrt(rMin * rMin + (rMax * rMax - rMin * rMin) * rng());
+    const x = Math.cos(a) * d, z = Math.sin(a) * d;
 
-    // Position le long du couloir départ → plateforme (t=0 : plateforme).
-    const t = 0.12 + 0.83 * rng();
-    const cx = sx * t;
-    const cz = sz * t;
-    // Décalage latéral perpendiculaire au couloir.
-    const perpX = spawnDist > 0 ? -sz / spawnDist : 1;
-    const perpZ = spawnDist > 0 ? sx / spawnDist : 0;
-    const lat = (rng() * 2 - 1) * cfg.corridor;
-    const x = cx + perpX * lat;
-    const z = cz + perpZ * lat;
-    const y = 6 + rng() * cfg.maxHeight;
-    const size = 2.5 + rng() * 6.5;
+    let size, h = 0, y, rot;
+    if (kind === "column") {
+      size = 1.6 + rng() * 1.6;                 // rayon du pilier
+      h = 12 + rng() * cfg.maxHeight * 0.6;     // hauteur, ancré au sol
+      y = h / 2;
+      rot = [0, rng() * Math.PI * 2, 0];
+      if (d < cfg.platformRadius + 22) continue; // jamais collé à la plateforme
+    } else if (kind === "ring") {
+      size = 4 + rng() * 3;                     // rayon majeur de l'anneau
+      y = 10 + rng() * cfg.maxHeight * 0.85;
+      rot = [rng() * Math.PI * 2, rng() * Math.PI * 2, rng() * Math.PI * 2];
+    } else if (kind === "crystal") {
+      size = 2 + rng() * 3.2;
+      y = 6 + rng() * cfg.maxHeight;
+      rot = [rng() * 0.5, rng() * Math.PI * 2, rng() * 0.5];
+    } else { // rock / box
+      size = 2.5 + rng() * 6.5;
+      y = 6 + rng() * cfg.maxHeight;
+      rot = [rng() * Math.PI * 2, rng() * Math.PI * 2, rng() * Math.PI * 2];
+    }
 
-    // Zone de sécurité : pas d'astéroïde bas au-dessus de la plateforme…
-    const distPlat = Math.hypot(x, z);
-    if (distPlat < cfg.platformRadius + 20 && y < 45) continue;
-    // …ni trop près du point de départ.
-    const dSpawn = Math.hypot(x - sx, y - cfg.spawn[1], z - sz);
-    if (dSpawn < 28) continue;
+    // Ciel dégagé juste au-dessus de la plateforme
+    if (d < cfg.platformRadius + 14 && y < 42) continue;
+    // Bulle de sécurité au départ…
+    if (Math.hypot(x - sx, y - sy, z - sz) < 26) continue;
+    // …et autour de la pièce
+    if (Math.hypot(x - cx, y - cy, z - cz) < 18) continue;
+    if (kind === "column" && Math.hypot(x - cx, z - cz) < 16 && cy < h + 8) continue;
 
-    list.push({
-      pos: [x, y, z],
-      size,
-      kind: rng() < 0.25 ? "box" : "rock",
-      rot: [rng() * Math.PI * 2, rng() * Math.PI * 2, rng() * Math.PI * 2],
-      hue: rng(),
-    });
+    list.push({ kind, pos: [x, y, z], size, h, rot, hue: rng() });
   }
   return list;
 }

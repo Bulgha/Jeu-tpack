@@ -145,3 +145,25 @@ html, body {
   color: #6fe08a;
   white-space: nowrap;
 }
+#stab.warn { border-color: #ffb84a; color: #ffd24a; }
+
+/* Toast : pièce ramassée, secrets découverts */
+#toast {
+  position: absolute;
+  top: 76px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20, 16, 40, 0.85);
+  border: 2px solid #ffd24a;
+  border-radius: 14px;
+  padding: 14px 30px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #ffe9ad;
+  white-space: nowrap;
+  box-shadow: 0 0 30px rgba(255, 210, 74, 0.35);
+}
+#toast.pop { animation: toast-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1); }
+@keyframes toast-pop {
+  0% { transform: translateX(-50%) scale(0.4); opacity: 0; }
+  100% { transform: translateX(-50%) scale(1); opacity: 1; }
+}

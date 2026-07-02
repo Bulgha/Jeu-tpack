@@ -16,8 +16,9 @@
   <!-- ===== Menu principal ===== -->
   <div id="menu" class="screen">
     <h1>🚀 Fusée T-Pack</h1>
-    <p class="subtitle">Traversez le champ d'astéroïdes et posez-vous sur la plateforme.<br/>
+    <p class="subtitle">Récupérez la pièce ⭐, traversez les obstacles et posez-vous sur la plateforme.<br/>
       Attention : le carburant est compté.</p>
+    <p class="subtitle" id="menu-eggs"></p>
     <div id="level-grid"></div>
     <div class="help">
       <h3>Commandes</h3>
@@ -29,9 +30,11 @@
         <li><b>+ / −</b> — régler la puissance de poussée</li>
         <li><b>R</b> — recommencer &nbsp;·&nbsp; <b>P</b> — pause &nbsp;·&nbsp; <b>Échap</b> — menu</li>
       </ul>
-      <p>Les trains d'atterrissage sortent <b>automatiquement</b> près de la cible.
-        Pour réussir : posez les <b>4 pieds sur la plateforme</b> et restez stable <b>2 s</b> —
-        sans basculer sur le côté !</p>
+      <p><b>1)</b> Récupérez la <b>pièce ⭐</b> (balise dorée) : sans elle, les trains
+        d'atterrissage restent verrouillés.<br/>
+        <b>2)</b> Les trains sortent <b>automatiquement</b> près de la cible (et rentrent
+        si vous vous en éloignez). Posez les <b>4 pieds sur la plateforme</b> et restez
+        stable <b>2 s</b> — sans basculer !</p>
     </div>
   </div>
 
@@ -59,9 +62,11 @@
       <div class="stat"><label>V. horizontale</label><span id="stat-hs">0.0 m/s</span></div>
       <div class="stat"><label>Inclinaison</label><span id="stat-tilt">0°</span></div>
       <div class="stat"><label>Distance plateforme</label><span id="stat-dist">0 m</span></div>
-      <div class="stat"><label>Trains d'atterrissage</label><span id="stat-legs">Repliés</span></div>
+      <div class="stat"><label>Pièce</label><span id="stat-piece">À récupérer ⭐</span></div>
+      <div class="stat"><label>Trains d'atterrissage</label><span id="stat-legs">Verrouillés 🔒</span></div>
     </div>
     <div id="stab" class="hidden"></div>
+    <div id="toast" class="hidden"></div>
   </div>
 
   <!-- ===== Superposition (prêt / victoire / crash / pause) ===== -->

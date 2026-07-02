@@ -56,9 +56,16 @@ Le jeu est aussi directement hébergeable sur GitHub Pages (aucun build).
 
 ## 🏁 Règles
 
+- Chaque niveau commence par la **pièce ⭐** (balise dorée) : tant qu'elle
+  n'est pas ramassée, les trains d'atterrissage restent **verrouillés** —
+  impossible de se poser.
 - Les **trains d'atterrissage** (4 pieds) sont cachés dans le fuselage et
   sortent automatiquement à l'approche de la cible : ils coulissent hors
-  du bas de la fusée puis s'écartent.
+  du bas de la fusée puis s'écartent. Si l'on s'éloigne de la plateforme,
+  ils **rentrent** — pas question de se poser dans l'herbe.
+- Les obstacles entourent la plateforme sur **360°**, avec 5 familles :
+  rochers, blocs, cristaux lumineux, anneaux de pierre (on peut passer
+  par le trou !) et piliers rocheux ancrés au sol.
 - Le niveau est réussi quand les **4 pieds reposent sur la plateforme**
   et que la fusée reste **immobile pendant 2 secondes** — n'importe où
   sur le plateau.
@@ -66,8 +73,10 @@ Le jeu est aussi directement hébergeable sur GitHub Pages (aucun build).
   redresse toute seule si elle arrive un peu penchée ou un peu vite. Mais
   au-delà d'un certain angle, elle bascule… et n'explose que **couchée au
   sol** — il reste donc un instant pour la rattraper au moteur !
-- Toucher un astéroïde, piquer du nez dans le sol, ou taper la
+- Toucher un obstacle, piquer du nez dans le sol, ou taper la
   plateforme à plus de **12 m/s** = 💥 crash.
+- 🥚 On raconte que **3 secrets** se cachent quelque part dans la
+  carte… ouvrez l'œil en explorant, ils valent le détour.
 - Le réservoir est plein au départ de chaque niveau, mais de plus en plus
   juste au fil des niveaux — gérez la poussée !
 - Un niveau réussi débloque le suivant (progression sauvegardée dans le

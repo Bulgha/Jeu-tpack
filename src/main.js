@@ -3,7 +3,7 @@
 // sur la plateforme. 10 niveaux, carburant limité.
 
 import * as THREE from "three";
-import { LEVELS, buildAsteroids, mulberry32 } from "./levels.js";
+import { LEVELS, buildObstacles, mulberry32 } from "./levels.js";
 
 /* ============================== Constantes ============================== */
 
@@ -68,6 +68,9 @@ const sun = new THREE.DirectionalLight(0xffdcb0, 1.3);
 sun.position.set(180, 140, 80);
 scene.add(sun);
 scene.add(new THREE.AmbientLight(0xfff1de, 0.18));
+
+// Objets secrets cachés dans le décor (remplis par le bloc ci-dessous)
+const eggObjects = {};
 
 // Décor naturel : ciel dégradé, prairie, lacs, arbres, collines
 {
@@ -164,11 +167,89 @@ scene.add(new THREE.AmbientLight(0xfff1de, 0.18));
     hill.position.set(Math.cos(a) * d, h / 2 - 2, Math.sin(a) * d);
     scene.add(hill);
   }
+
+  // ----- Secrets cachés dans la carte (chut !) -----
+
+  // Un canard géant flotte sur le lac le plus proche de la plateforme
+  const duckLake = lakes.reduce((a, b) => (Math.hypot(a.x, a.z) < Math.hypot(b.x, b.z) ? a : b));
+  {
+    const duck = new THREE.Group();
+    const yellow = new THREE.MeshStandardMaterial({ color: 0xffd83d, roughness: 0.6 });
+    const orange = new THREE.MeshStandardMaterial({ color: 0xff8c1a, roughness: 0.6 });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(2.2, 14, 12), yellow);
+    body.scale.set(1.3, 0.95, 1);
+    duck.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(1.25, 12, 10), yellow);
+    head.position.set(1.9, 2.1, 0);
+    duck.add(head);
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.1, 10), orange);
+    beak.rotation.z = -Math.PI / 2;
+    beak.position.set(3.2, 2, 0);
+    duck.add(beak);
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x14141c });
+    for (const s of [-1, 1]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), eyeMat);
+      eye.position.set(2.7, 2.5, s * 0.55);
+      duck.add(eye);
+    }
+    duck.position.set(duckLake.x, 1.1, duckLake.z);
+    duck.rotation.y = rng() * Math.PI * 2;
+    scene.add(duck);
+    eggObjects.duck = duck;
+  }
+
+  // Un monolithe noir, seul au milieu de la prairie
+  {
+    const monolith = new THREE.Mesh(
+      new THREE.BoxGeometry(1.4, 6.8, 3.1),
+      new THREE.MeshStandardMaterial({ color: 0x0a0a10, roughness: 0.15, metalness: 0.9 })
+    );
+    monolith.position.set(-180, 3.4, 120);
+    monolith.rotation.y = 0.6;
+    scene.add(monolith);
+    eggObjects.monolith = monolith;
+  }
+
+  // Une soucoupe posée discrètement dans l'herbe
+  {
+    const ufo = new THREE.Group();
+    const hullMat = new THREE.MeshStandardMaterial({ color: 0x9aa7b8, metalness: 0.85, roughness: 0.3 });
+    const hull = new THREE.Mesh(new THREE.SphereGeometry(3.2, 18, 10), hullMat);
+    hull.scale.set(1, 0.32, 1);
+    ufo.add(hull);
+    const dome = new THREE.Mesh(
+      new THREE.SphereGeometry(1.3, 14, 10),
+      new THREE.MeshStandardMaterial({ color: 0x9fe3ff, emissive: 0x3fa8d8, emissiveIntensity: 0.5, roughness: 0.1 })
+    );
+    dome.scale.set(1, 0.75, 1);
+    dome.position.y = 0.8;
+    ufo.add(dome);
+    const lampMat = new THREE.MeshBasicMaterial({ color: 0xffe28a });
+    for (let k = 0; k < 6; k++) {
+      const a2 = (k / 6) * Math.PI * 2;
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), lampMat);
+      lamp.position.set(Math.cos(a2) * 2.4, -0.15, Math.sin(a2) * 2.4);
+      ufo.add(lamp);
+    }
+    ufo.position.set(200, 1.6, -160);
+    scene.add(ufo);
+    eggObjects.ufo = ufo;
+  }
 }
 
 /* --------------------------- Plateforme -------------------------------- */
 
 let platformGroup = null;
+let platformBeam = null;
+let platformLight = null;
+
+// Balise de la plateforme : ambre tant que la pièce n'est pas ramassée,
+// verte quand l'atterrissage est autorisé.
+function setBeacon(armed) {
+  const c = armed ? 0x6fe08a : 0xffb84a;
+  if (platformBeam) platformBeam.material.color.setHex(c);
+  if (platformLight) platformLight.color.setHex(c);
+}
 
 function buildPlatform(radius) {
   if (platformGroup) { scene.remove(platformGroup); disposeGroup(platformGroup); }
@@ -200,16 +281,16 @@ function buildPlatform(radius) {
   }
 
   // Colonne lumineuse de balisage
-  const beam = new THREE.Mesh(
+  platformBeam = new THREE.Mesh(
     new THREE.CylinderGeometry(0.6, 0.6, 90, 12, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0x6fe08a, transparent: true, opacity: 0.13, depthWrite: false })
+    new THREE.MeshBasicMaterial({ color: 0xffb84a, transparent: true, opacity: 0.13, depthWrite: false })
   );
-  beam.position.y = 45 + PLATFORM_TOP;
-  g.add(beam);
+  platformBeam.position.y = 45 + PLATFORM_TOP;
+  g.add(platformBeam);
 
-  const light = new THREE.PointLight(0x6fe08a, 30, 60);
-  light.position.y = PLATFORM_TOP + 4;
-  g.add(light);
+  platformLight = new THREE.PointLight(0xffb84a, 30, 60);
+  platformLight.position.y = PLATFORM_TOP + 4;
+  g.add(platformLight);
 
   scene.add(g);
   platformGroup = g;
@@ -314,24 +395,78 @@ scene.add(rocketMesh);
 
 const asteroidGroup = new THREE.Group();
 scene.add(asteroidGroup);
-let colliders = []; // { center: Vector3, r: number }
+let colliders = []; // { center: Vector3, r: number, kind: string }
 
-function buildAsteroidField(cfg) {
+const OBSTACLE_LABEL = {
+  rock: "un rocher", box: "un bloc", crystal: "un cristal",
+  ring: "un anneau de pierre", column: "un pilier rocheux",
+};
+
+function buildObstacleField(cfg) {
   disposeGroup(asteroidGroup);
   asteroidGroup.clear();
   colliders = [];
 
-  const list = buildAsteroids(cfg);
-  list.forEach((a, i) => {
-    let mesh, collR;
-    if (a.kind === "box") {
+  const list = buildObstacles(cfg);
+  const _e = new THREE.Euler(), _q = new THREE.Quaternion(), _c = new THREE.Vector3();
+
+  list.forEach((o, i) => {
+    let mesh;
+    const center = new THREE.Vector3(...o.pos);
+
+    if (o.kind === "box") {
       mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(a.size * 1.6, a.size * 1.1, a.size * 1.3),
-        rockMaterial(a.hue, true)
+        new THREE.BoxGeometry(o.size * 1.6, o.size * 1.1, o.size * 1.3),
+        rockMaterial(o.hue, true)
       );
-      collR = a.size * 0.95;
-    } else {
-      const geo = new THREE.IcosahedronGeometry(a.size, 1);
+      colliders.push({ center, r: o.size * 0.95, kind: o.kind });
+
+    } else if (o.kind === "crystal") {
+      // Cristal : octaèdre étiré, légèrement lumineux, + deux éclats
+      const c = new THREE.Color().setHSL(0.5 + o.hue * 0.28, 0.6, 0.55);
+      const mat = new THREE.MeshStandardMaterial({
+        color: c, emissive: c, emissiveIntensity: 0.35,
+        roughness: 0.25, metalness: 0.1, flatShading: true,
+      });
+      mesh = new THREE.Mesh(new THREE.OctahedronGeometry(o.size, 0), mat);
+      mesh.scale.y = 1.6;
+      for (const [dx, dz, s] of [[0.7, 0.35, 0.45], [-0.55, -0.5, 0.35]]) {
+        const shard = new THREE.Mesh(new THREE.OctahedronGeometry(o.size * s, 0), mat);
+        shard.position.set(o.size * dx, -o.size * 0.4, o.size * dz);
+        shard.rotation.set(0.4, 1.2, 0.3);
+        mesh.add(shard);
+      }
+      colliders.push({ center, r: o.size * 1.35, kind: o.kind });
+
+    } else if (o.kind === "ring") {
+      // Anneau de pierre : on peut passer par le trou ! La collision est
+      // modélisée par 10 sphères le long du tore.
+      const minor = o.size * 0.3;
+      mesh = new THREE.Mesh(new THREE.TorusGeometry(o.size, minor, 8, 22), rockMaterial(o.hue, false));
+      _e.set(...o.rot);
+      _q.setFromEuler(_e);
+      for (let k = 0; k < 10; k++) {
+        const th = (k / 10) * Math.PI * 2;
+        _c.set(Math.cos(th) * o.size, Math.sin(th) * o.size, 0).applyQuaternion(_q);
+        colliders.push({ center: _c.clone().add(center), r: minor * 1.4, kind: o.kind });
+      }
+
+    } else if (o.kind === "column") {
+      // Pilier rocheux ancré au sol : sphères de collision empilées
+      mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(o.size * 0.65, o.size * 1.05, o.h, 9),
+        rockMaterial(o.hue, false)
+      );
+      const n = Math.max(2, Math.ceil(o.h / (o.size * 1.6)));
+      for (let k = 0; k < n; k++) {
+        colliders.push({
+          center: new THREE.Vector3(o.pos[0], ((k + 0.5) / n) * o.h, o.pos[2]),
+          r: o.size * 1.05, kind: o.kind,
+        });
+      }
+
+    } else { // rock
+      const geo = new THREE.IcosahedronGeometry(o.size, 1);
       // Déformation aléatoire des sommets pour un aspect rocheux
       const rng = mulberry32(cfg.seed * 977 + i);
       const p = geo.getAttribute("position");
@@ -340,13 +475,13 @@ function buildAsteroidField(cfg) {
         p.setXYZ(v, p.getX(v) * k, p.getY(v) * k, p.getZ(v) * k);
       }
       geo.computeVertexNormals();
-      mesh = new THREE.Mesh(geo, rockMaterial(a.hue, false));
-      collR = a.size * 1.15;
+      mesh = new THREE.Mesh(geo, rockMaterial(o.hue, false));
+      colliders.push({ center, r: o.size * 1.15, kind: o.kind });
     }
-    mesh.position.set(...a.pos);
-    mesh.rotation.set(...a.rot);
+
+    mesh.position.set(...o.pos);
+    mesh.rotation.set(...o.rot);
     asteroidGroup.add(mesh);
-    colliders.push({ center: new THREE.Vector3(...a.pos), r: collR });
   });
 }
 
@@ -369,17 +504,22 @@ const debrisGeo = new THREE.TetrahedronGeometry(0.45);
 const debrisMats = [0xe9ecf2, 0xd6452e, 0x2c2f38, 0xff9a3d].map(
   (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7, flatShading: true })
 );
+// Confettis de fête (pièce ramassée, secrets découverts)
+const confettiMats = [0xff5252, 0xffd24a, 0x6fe08a, 0x4a7dff, 0xff8ae2].map(
+  (c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.4, roughness: 0.5, flatShading: true })
+);
 let flashLight = null;
 
-function spawnDebris(at) {
-  for (let i = 0; i < 30; i++) {
-    const m = new THREE.Mesh(debrisGeo, debrisMats[i % debrisMats.length]);
+function spawnDebris(at, mats = debrisMats, flash = true) {
+  for (let i = 0; i < 32; i++) {
+    const m = new THREE.Mesh(debrisGeo, mats[i % mats.length]);
     m.position.copy(at);
     const v = new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.8, Math.random() - 0.5)
       .normalize().multiplyScalar(6 + Math.random() * 14);
     debris.push({ mesh: m, vel: v, spin: new THREE.Vector3(Math.random() * 8, Math.random() * 8, Math.random() * 8), life: 2.5 });
     scene.add(m);
   }
+  if (!flash) return;
   flashLight = new THREE.PointLight(0xffa040, 400, 120);
   flashLight.position.copy(at);
   scene.add(flashLight);
@@ -407,6 +547,125 @@ function clearDebris() {
   debris.forEach((d) => scene.remove(d.mesh));
   debris.length = 0;
   if (flashLight) { scene.remove(flashLight); flashLight = null; }
+}
+
+/* ========================= Pièce à récupérer =========================== */
+
+let coinGroup = null;   // groupe complet (pièce + balise)
+let coinSpin = null;    // partie tournante
+const coinPos = new THREE.Vector3();
+let pieceCollected = false;
+
+function buildCoin(cfg) {
+  if (coinGroup) { scene.remove(coinGroup); disposeGroup(coinGroup); }
+  coinGroup = new THREE.Group();
+  coinPos.set(...cfg.coin);
+
+  const gold = new THREE.MeshStandardMaterial({
+    color: 0xffd24a, metalness: 0.85, roughness: 0.25,
+    emissive: 0xaa7700, emissiveIntensity: 0.4,
+  });
+  coinSpin = new THREE.Group();
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 0.35, 26), gold);
+  disc.rotation.z = Math.PI / 2; // debout, comme une pièce
+  coinSpin.add(disc);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(2.2, 0.22, 10, 26), gold);
+  coinSpin.add(rim);
+  const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.9, 0), gold);
+  coinSpin.add(star);
+  coinGroup.add(coinSpin);
+
+  // Balise dorée jusqu'au sol pour repérer la pièce de loin
+  const beam = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.45, 0.45, 80, 10, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xffd24a, transparent: true, opacity: 0.16, depthWrite: false })
+  );
+  beam.position.y = -cfg.coin[1] + 40;
+  coinGroup.add(beam);
+
+  const light = new THREE.PointLight(0xffd24a, 25, 35);
+  coinGroup.add(light);
+
+  coinGroup.position.copy(coinPos);
+  scene.add(coinGroup);
+}
+
+function collectPiece() {
+  pieceCollected = true;
+  coinGroup.visible = false;
+  setBeacon(true);
+  spawnDebris(coinPos, confettiMats, false);
+  audioCoin();
+  showToast("⭐ Pièce récupérée ! Trains d'atterrissage armés — cap sur la plateforme.");
+}
+
+/* ====================== Toast & secrets cachés ========================== */
+
+let toastTimer = 0;
+
+function showToast(text) {
+  const t = $("toast");
+  t.textContent = text;
+  t.classList.remove("hidden", "pop");
+  void t.offsetWidth; // relance l'animation CSS
+  t.classList.add("pop");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add("hidden"), 5000);
+}
+
+const EGGS = [
+  { id: "canard", obj: () => eggObjects.duck, r: 13,
+    msg: "🦆 COIN-COIN ! Le Canard Ancestral vous accorde sa bénédiction." },
+  { id: "monolithe", obj: () => eggObjects.monolith, r: 13,
+    msg: "🗿 Le Monolithe vibre doucement… « L'aube de l'humanité », murmure-t-il. ✨" },
+  { id: "ovni", obj: () => eggObjects.ufo, r: 14,
+    msg: "👽 Repérés ! Les visiteurs plient bagage — à bientôt, pilote." },
+];
+let eggsFound = new Set();
+try { eggsFound = new Set(JSON.parse(localStorage.getItem("tpack-eggs") || "[]")); } catch { /* tant pis */ }
+const eggsThisRun = new Set();
+const eggAnims = []; // { type, obj, t }
+
+function checkEggs() {
+  for (const egg of EGGS) {
+    if (eggsThisRun.has(egg.id)) continue;
+    const obj = egg.obj();
+    if (!obj || pos.distanceToSquared(obj.position) > egg.r * egg.r) continue;
+    eggsThisRun.add(egg.id);
+    showToast(egg.msg);
+    audioEgg();
+    spawnDebris(obj.position.clone().add(new THREE.Vector3(0, 3, 0)), confettiMats, false);
+    eggAnims.push({ type: egg.id, obj, t: 0, baseY: obj.position.y });
+    if (!eggsFound.has(egg.id)) {
+      eggsFound.add(egg.id);
+      localStorage.setItem("tpack-eggs", JSON.stringify([...eggsFound]));
+    }
+  }
+}
+
+// Petites animations de célébration des secrets
+function updateEggAnims(dt) {
+  for (let i = eggAnims.length - 1; i >= 0; i--) {
+    const a = eggAnims[i];
+    a.t += dt;
+    if (a.type === "canard") {
+      a.obj.rotation.y += 7 * dt;
+      a.obj.position.y = a.baseY + Math.abs(Math.sin(a.t * 6)) * 1.4;
+      if (a.t > 2.6) { a.obj.position.y = a.baseY; eggAnims.splice(i, 1); }
+    } else if (a.type === "ovni") {
+      a.obj.rotation.y += 6 * dt;
+      a.obj.position.y += (6 + a.t * 22) * dt;
+      a.obj.position.x += a.t * 14 * dt;
+      if (a.t > 5) { a.obj.visible = false; eggAnims.splice(i, 1); }
+    } else if (a.type === "monolithe") {
+      const s = 1 + Math.sin(Math.min(a.t, 2) * Math.PI) * 0.08;
+      a.obj.scale.set(s, s, s);
+      a.obj.rotation.y += 0.4 * dt;
+      if (a.t > 2) { a.obj.scale.set(1, 1, 1); eggAnims.splice(i, 1); }
+    } else {
+      eggAnims.splice(i, 1);
+    }
+  }
 }
 
 /* ============================== Audio =================================== */
@@ -463,6 +722,31 @@ function audioSuccess() {
   });
 }
 
+function audioCoin() {
+  if (!AC) return;
+  [[988, 0], [1319, 0.09]].forEach(([freq, at]) => {
+    const o = AC.createOscillator(); o.type = "triangle"; o.frequency.value = freq;
+    const g = AC.createGain();
+    g.gain.setValueAtTime(0.22, AC.currentTime + at);
+    g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + at + 0.25);
+    o.connect(g).connect(AC.destination);
+    o.start(AC.currentTime + at); o.stop(AC.currentTime + at + 0.3);
+  });
+}
+
+function audioEgg() {
+  if (!AC) return;
+  [523, 659, 784, 1047].forEach((freq, i) => {
+    const at = i * 0.11;
+    const o = AC.createOscillator(); o.type = "square"; o.frequency.value = freq;
+    const g = AC.createGain();
+    g.gain.setValueAtTime(0.12, AC.currentTime + at);
+    g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + at + 0.28);
+    o.connect(g).connect(AC.destination);
+    o.start(AC.currentTime + at); o.stop(AC.currentTime + at + 0.3);
+  });
+}
+
 /* ============================ État du jeu =============================== */
 
 let state = "menu"; // menu | ready | flying | paused | landed | crashed
@@ -495,6 +779,9 @@ function showMenu() {
   hudEl.classList.add("hidden");
   overlayEl.classList.add("hidden");
   rebuildLevelGrid();
+  $("menu-eggs").textContent = eggsFound.size
+    ? `🥚 Secrets découverts : ${eggsFound.size}/3`
+    : "🥚 On raconte que 3 secrets se cachent quelque part dans la carte…";
 }
 
 function rebuildLevelGrid() {
@@ -516,7 +803,11 @@ function startLevel(i) {
   cfg = LEVELS[i];
 
   buildPlatform(cfg.platformRadius);
-  buildAsteroidField(cfg);
+  buildObstacleField(cfg);
+  buildCoin(cfg);
+  pieceCollected = false;
+  setBeacon(false);
+  eggsThisRun.clear();
   clearDebris();
 
   pos.set(...cfg.spawn);
@@ -546,12 +837,13 @@ function startLevel(i) {
 
   state = "ready";
   const dist = Math.round(Math.hypot(cfg.spawn[0], cfg.spawn[2]));
+  const coinDist = Math.round(Math.hypot(cfg.coin[0], cfg.coin[2]));
   showOverlay(
     `Niveau ${i + 1} — ${cfg.name}`,
     `Plateforme à ${dist} m (rayon ${cfg.platformRadius} m). Carburant : ${cfg.fuel} unités.` +
       (cfg.gravity > 10 ? " ⚠️ Gravité renforcée !" : "") +
-      `\nLes trains d'atterrissage sortent automatiquement près de la cible.` +
-      `\nPosez les 4 pieds sur la plateforme et restez stable ${STABLE_TIME} s — sans basculer !`,
+      `\n1) Récupérez la pièce ⭐ (balise dorée, à ${coinDist} m de la plateforme) : sans elle, les trains restent verrouillés.` +
+      `\n2) Posez les 4 pieds sur la plateforme et restez stable ${STABLE_TIME} s — sans basculer !`,
     [["Décoller 🚀", beginFlight]]
   );
 }
@@ -661,10 +953,17 @@ function physicsStep(dt) {
   }
   if (yaw) angVel.addScaledVector(UP, yaw * YAW_ACCEL * dt);
 
-  // --- Trains d'atterrissage : sortie automatique près de la cible ---
+  // --- Trains d'atterrissage : ils ne s'arment qu'avec la pièce à bord,
+  // sortent à l'approche de la cible et RENTRENT si on s'en éloigne
+  // (impossible de se poser ailleurs que sur la plateforme) ---
   const hDistNow = Math.hypot(pos.x, pos.z);
-  if (hDistNow < cfg.platformRadius + 40 && pos.y - PLATFORM_TOP < 45) legsTriggered = true;
-  if (legsTriggered && legsDeploy < 1) legsDeploy = Math.min(1, legsDeploy + dt / LEG_DEPLOY_T);
+  const altPad = pos.y - PLATFORM_TOP;
+  if (!wasContact) {
+    if (pieceCollected && hDistNow < cfg.platformRadius + 25 && altPad < 45) legsTriggered = true;
+    else if (!pieceCollected || hDistNow > cfg.platformRadius + 35 || altPad > 55) legsTriggered = false;
+  }
+  const legStep = dt / LEG_DEPLOY_T;
+  legsDeploy += THREE.MathUtils.clamp((legsTriggered ? 1 : 0) - legsDeploy, -legStep, legStep);
   setLegPose(legsDeploy);
   const legsOut = legsDeploy >= 0.95;
 
@@ -764,6 +1063,10 @@ function physicsStep(dt) {
   checkCollisions();
   if (state !== "flying") return;
 
+  // --- Pièce à récupérer & secrets cachés ---
+  if (!pieceCollected && pos.distanceToSquared(coinPos) < 5.5 * 5.5) collectPiece();
+  checkEggs();
+
   // --- Stabilisation : 4 pieds posés + immobilité pendant STABLE_TIME ---
   feetOn = 0;
   let onGrass = 0;
@@ -796,7 +1099,7 @@ function checkCollisions() {
       _p.set(0, ly, 0).applyQuaternion(quat).add(pos);
       const rr = c.r + 1.0;
       if (_p.distanceToSquared(c.center) < rr * rr) {
-        crash("La fusée a percuté un astéroïde.");
+        crash(`La fusée a percuté ${OBSTACLE_LABEL[c.kind] || "un obstacle"}.`);
         return;
       }
     }
@@ -896,16 +1199,23 @@ function updateHUD() {
 
   setStat("stat-dist", `${Math.round(hDist)} m`);
 
-  setStat("stat-legs", legsDeploy >= 0.95 ? "Sortis" : legsTriggered ? "Sortie…" : "Repliés",
+  setStat("stat-legs", legsDeploy >= 0.95 ? "Sortis" : legsDeploy > 0.02 ? "Manœuvre…" : pieceCollected ? "Repliés" : "Verrouillés 🔒",
     legsDeploy >= 0.95 ? true : undefined);
 
-  // Compteur de stabilisation
+  setStat("stat-piece", pieceCollected ? "Ramassée ✓" : "À récupérer ⭐", pieceCollected);
+
+  // Compteur de stabilisation / avertissement pièce manquante
   const stab = $("stab");
   if (state === "flying" && feetOn === 4) {
-    stab.classList.remove("hidden");
+    stab.classList.remove("hidden", "warn");
     stab.textContent = stableT > 0
       ? `Stabilisation… ${Math.min(stableT, STABLE_TIME).toFixed(1)} / ${STABLE_TIME.toFixed(1)} s`
       : "Stabilisez la fusée !";
+  } else if (state === "flying" && !pieceCollected &&
+             hDist < cfg.platformRadius + 25 && pos.y - PLATFORM_TOP < 45) {
+    stab.classList.remove("hidden");
+    stab.classList.add("warn");
+    stab.textContent = "🔒 Trains verrouillés — récupérez d'abord la pièce ⭐ !";
   } else {
     stab.classList.add("hidden");
   }
@@ -976,6 +1286,11 @@ function animate() {
 
   if (state === "flying") physicsStep(dt);
   updateDebris(dt);
+  updateEggAnims(dt);
+  if (coinGroup && coinGroup.visible && coinSpin) {
+    coinSpin.rotation.y += 2.2 * dt;
+    coinSpin.position.y = Math.sin(performance.now() / 400) * 0.6;
+  }
   if (state !== "menu") {
     updateCamera(dt);
     updateHUD();
@@ -988,15 +1303,18 @@ function animate() {
   GAME.legs = legsDeploy;
   GAME.feetOn = feetOn;
   GAME.stableT = stableT;
+  GAME.piece = pieceCollected;
 
   renderer.render(scene, camera);
 }
 
 // Exposé pour le débogage et les tests automatisés
 const GAME = {
-  state, fuel, level: 1, pos, vel, quat, angVel, camDir, startLevel, beginFlight, showMenu,
-  legs: 0, feetOn: 0, stableT: 0,
-  deployLegs() { legsTriggered = true; legsDeploy = 1; },
+  state, fuel, level: 1, pos, vel, quat, angVel, camDir, coinPos, startLevel, beginFlight, showMenu,
+  legs: 0, feetOn: 0, stableT: 0, piece: false,
+  eggPositions: () => EGGS.map((e) => e.obj()?.position),
+  givePiece() { if (!pieceCollected) collectPiece(); },
+  deployLegs() { if (!pieceCollected) collectPiece(); legsTriggered = true; legsDeploy = 1; },
 };
 window.GAME = GAME;
 
