@@ -43,6 +43,53 @@ const $ = (id) => document.getElementById(id);
 const menuEl = $("menu"), hudEl = $("hud"), overlayEl = $("overlay");
 const overlayTitle = $("overlay-title"), overlayText = $("overlay-text"),
       overlayButtons = $("overlay-buttons"), levelGrid = $("level-grid");
+const settingsEl = $("settings");
+
+/* ============================ Réglages ================================== */
+
+const SETTINGS_KEY = "tpack-settings";
+const settings = { sound: true, volume: 70, ghost: true, mouseCam: false };
+try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}")); } catch { /* défauts */ }
+
+function saveSettings() {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  applyAudioSettings();
+}
+
+function openSettings() {
+  $("set-sound").checked = settings.sound;
+  $("set-volume").value = settings.volume;
+  $("set-volume-txt").textContent = `${settings.volume} %`;
+  $("set-ghost").checked = settings.ghost;
+  $("set-kb").checked = !settings.mouseCam;
+  $("set-kbm").checked = settings.mouseCam;
+  const ol = $("records-list");
+  ol.innerHTML = "";
+  LEVELS.forEach((lv, i) => {
+    const li = document.createElement("li");
+    li.innerHTML = `${lv.name} — <span class="rec-time">${records[i] !== undefined ? records[i].toFixed(1) + " s" : "—"}</span>`;
+    ol.appendChild(li);
+  });
+  settingsEl.classList.remove("hidden");
+}
+
+function closeSettings() {
+  settingsEl.classList.add("hidden");
+}
+
+function initSettingsUI() {
+  $("btn-settings").addEventListener("click", openSettings);
+  $("btn-close-settings").addEventListener("click", closeSettings);
+  $("set-sound").addEventListener("change", (e) => { settings.sound = e.target.checked; saveSettings(); });
+  $("set-volume").addEventListener("input", (e) => {
+    settings.volume = +e.target.value;
+    $("set-volume-txt").textContent = `${settings.volume} %`;
+    saveSettings();
+  });
+  $("set-ghost").addEventListener("change", (e) => { settings.ghost = e.target.checked; saveSettings(); });
+  $("set-kb").addEventListener("change", () => { settings.mouseCam = false; saveSettings(); });
+  $("set-kbm").addEventListener("change", () => { settings.mouseCam = true; saveSettings(); });
+}
 
 /* ============================== Rendu 3D =============================== */
 
@@ -824,7 +871,7 @@ const _gq2 = new THREE.Quaternion();
 // Rejoue le fantôme au fil du chrono du joueur
 function updateGhost() {
   if (!ghostMesh || !ghostFrames.length) return;
-  if (state !== "flying" && state !== "ready") { ghostMesh.visible = false; return; }
+  if (!settings.ghost || (state !== "flying" && state !== "ready")) { ghostMesh.visible = false; return; }
   const ft = (state === "ready" ? 0 : elapsed) / ghostDt;
   const i0 = Math.floor(ft);
   if (i0 >= ghostFrames.length - 1) { ghostMesh.visible = false; return; }
@@ -1176,12 +1223,20 @@ function updateEggAnims(dt) {
 
 /* ============================== Audio =================================== */
 
-let AC = null, thrustGain = null, thrustFilter = null;
+let AC = null, thrustGain = null, thrustFilter = null, masterGain = null;
+
+// Applique les réglages son (activation + volume) au bus audio maître
+function applyAudioSettings() {
+  if (masterGain) masterGain.gain.value = settings.sound ? (settings.volume / 100) : 0;
+}
 
 function ensureAudio() {
   if (AC) { AC.resume?.(); return; }
   try {
     AC = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = AC.createGain();
+    masterGain.connect(AC.destination);
+    applyAudioSettings();
     const len = AC.sampleRate;
     const buf = AC.createBuffer(1, len, AC.sampleRate);
     const data = buf.getChannelData(0);
@@ -1191,7 +1246,7 @@ function ensureAudio() {
     thrustFilter = AC.createBiquadFilter();
     thrustFilter.type = "lowpass"; thrustFilter.frequency.value = 300;
     thrustGain = AC.createGain(); thrustGain.gain.value = 0;
-    src.connect(thrustFilter).connect(thrustGain).connect(AC.destination);
+    src.connect(thrustFilter).connect(thrustGain).connect(masterGain);
     src.start();
   } catch { AC = null; }
 }
@@ -1212,7 +1267,7 @@ function audioCrash() {
   f.frequency.setValueAtTime(1400, AC.currentTime);
   f.frequency.exponentialRampToValueAtTime(90, AC.currentTime + 0.65);
   const g = AC.createGain(); g.gain.value = 0.8;
-  src.connect(f).connect(g).connect(AC.destination);
+  src.connect(f).connect(g).connect(masterGain);
   src.start();
 }
 
@@ -1223,7 +1278,7 @@ function audioSuccess() {
     const g = AC.createGain();
     g.gain.setValueAtTime(0.25, AC.currentTime + at);
     g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + at + 0.35);
-    o.connect(g).connect(AC.destination);
+    o.connect(g).connect(masterGain);
     o.start(AC.currentTime + at); o.stop(AC.currentTime + at + 0.4);
   });
 }
@@ -1235,7 +1290,7 @@ function audioCoin() {
     const g = AC.createGain();
     g.gain.setValueAtTime(0.22, AC.currentTime + at);
     g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + at + 0.25);
-    o.connect(g).connect(AC.destination);
+    o.connect(g).connect(masterGain);
     o.start(AC.currentTime + at); o.stop(AC.currentTime + at + 0.3);
   });
 }
@@ -1248,7 +1303,7 @@ function audioEgg() {
     const g = AC.createGain();
     g.gain.setValueAtTime(0.12, AC.currentTime + at);
     g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + at + 0.28);
-    o.connect(g).connect(AC.destination);
+    o.connect(g).connect(masterGain);
     o.start(AC.currentTime + at); o.stop(AC.currentTime + at + 0.3);
   });
 }
@@ -1683,6 +1738,9 @@ const camDir = new THREE.Vector3(0, 0, 1);
 const _camTarget = new THREE.Vector3();
 const _desired = new THREE.Vector3();
 let camZoom = 1; // molette / pavé tactile : 0.45 (près) … 2.5 (loin)
+let camYaw = 0;  // orientation de l'orbite caméra (mode « clavier + souris »)
+const DEF_PITCH = Math.atan(11 / 26);
+let camPitch = DEF_PITCH;
 
 window.addEventListener("wheel", (e) => {
   if (state === "menu") return;
@@ -1690,22 +1748,38 @@ window.addEventListener("wheel", (e) => {
   camZoom = THREE.MathUtils.clamp(camZoom * Math.exp(e.deltaY * 0.0012), 0.45, 2.5);
 }, { passive: false });
 
-function updateCamera(dt, snap = false) {
-  _desired.set(pos.x, 0, pos.z);
-  if (_desired.lengthSq() > 1) _desired.normalize();
-  else _desired.copy(camDir);
+// Mode « clavier + souris » : la souris fait orbiter la caméra autour de la
+// fusée (horizontal = rotation, vertical = hauteur de vue)
+window.addEventListener("mousemove", (e) => {
+  if (!settings.mouseCam || state === "menu" || state === "paused") return;
+  camYaw -= e.movementX * 0.004;
+  camPitch = THREE.MathUtils.clamp(camPitch + e.movementY * 0.0035, 0.08, 1.15);
+});
 
-  // Directions quasi opposées : l'interpolation directe s'annulerait au
-  // milieu — on contourne par le côté pour que la caméra pivote toujours.
-  if (!snap && camDir.dot(_desired) < -0.7) {
-    _desired.set(-camDir.z, 0, camDir.x).add(camDir.clone().multiplyScalar(0.3)).normalize();
+function updateCamera(dt, snap = false) {
+  if (settings.mouseCam) {
+    // Caméra libre : orbite pilotée à la souris
+    camDir.set(Math.sin(camYaw), 0, Math.cos(camYaw));
+  } else {
+    // Caméra automatique : garde la plateforme dans l'axe
+    _desired.set(pos.x, 0, pos.z);
+    if (_desired.lengthSq() > 1) _desired.normalize();
+    else _desired.copy(camDir);
+
+    // Directions quasi opposées : l'interpolation directe s'annulerait au
+    // milieu — on contourne par le côté pour que la caméra pivote toujours.
+    if (!snap && camDir.dot(_desired) < -0.7) {
+      _desired.set(-camDir.z, 0, camDir.x).add(camDir.clone().multiplyScalar(0.3)).normalize();
+    }
+
+    if (snap) camDir.copy(_desired);
+    else camDir.lerp(_desired, 1 - Math.exp(-1.6 * dt)).normalize();
+    camYaw = Math.atan2(camDir.x, camDir.z);
   }
 
-  if (snap) camDir.copy(_desired);
-  else camDir.lerp(_desired, 1 - Math.exp(-1.6 * dt)).normalize();
-
-  _camTarget.copy(pos).addScaledVector(camDir, 26 * camZoom);
-  _camTarget.y = pos.y + 11 * camZoom;
+  const dist = 26 * camZoom;
+  _camTarget.copy(pos).addScaledVector(camDir, dist);
+  _camTarget.y = pos.y + dist * Math.tan(settings.mouseCam ? camPitch : DEF_PITCH);
   const camFloor = Math.max(3, terrainH(_camTarget.x, _camTarget.z) + 4);
   if (_camTarget.y < camFloor) _camTarget.y = camFloor;
 
@@ -1715,7 +1789,14 @@ function updateCamera(dt, snap = false) {
   camera.lookAt(pos.x, pos.y + 2, pos.z);
 }
 
-function snapCamera() { updateCamera(0, true); }
+function snapCamera() {
+  camPitch = DEF_PITCH;
+  if (settings.mouseCam) {
+    const d = Math.hypot(pos.x, pos.z);
+    if (d > 1) camYaw = Math.atan2(pos.x / d, pos.z / d);
+  }
+  updateCamera(0, true);
+}
 
 /* =============================== HUD ==================================== */
 
@@ -1817,7 +1898,8 @@ window.addEventListener("keydown", (e) => {
   } else if (e.code === "KeyN") {
     if (state === "landed" && levelIndex < LEVELS.length - 1) startLevel(levelIndex + 1);
   } else if (e.code === "Escape") {
-    if (state !== "menu") showMenu();
+    if (!settingsEl.classList.contains("hidden")) closeSettings();
+    else if (state !== "menu") showMenu();
   }
 });
 
@@ -1890,7 +1972,7 @@ function animate() {
 const GAME = {
   state, fuel, level: 1, pos, vel, quat, angVel, camDir, coinPos, startLevel, beginFlight, showMenu,
   legs: 0, feetOn: 0, stableT: 0, piece: false, piecesGot: 0, piecesNeeded: 1, zoom: 1, elapsed: 0,
-  ghostVisible: false, ghostFrames: 0, records,
+  ghostVisible: false, ghostFrames: 0, records, settings,
   eggPositions: () => EGGS.map((e) => e.obj()?.position),
   coinPositions: () => coinsState.map((c) => c.pos),
   givePiece() { for (const c of coinsState) if (!c.collected) collectPiece(c); },
@@ -1899,6 +1981,7 @@ const GAME = {
 };
 window.GAME = GAME;
 
+initSettingsUI();
 buildEnvironment("forest"); // décor derrière le menu
 showMenu();
 animate();

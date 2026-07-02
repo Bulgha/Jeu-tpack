@@ -51,6 +51,74 @@ html, body {
 #level-grid button:disabled { opacity: 0.35; cursor: not-allowed; border-color: #333c58; }
 #level-grid button.done { border-color: #3dbf6e; background: #16341f; }
 
+.menu-btn {
+  padding: 10px 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e8ecf5;
+  background: #2a3354;
+  border: 1px solid #3d5bbf;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.menu-btn:hover { background: #3a4670; }
+
+/* ===== Panneau de réglages ===== */
+#settings { z-index: 12; }
+#settings-panel {
+  background: rgba(16, 21, 42, 0.95);
+  border: 1px solid #3d5bbf;
+  border-radius: 14px;
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 380px;
+  max-height: 88vh;
+  overflow-y: auto;
+  text-align: left;
+}
+#settings-panel h2 { font-size: 1.5rem; text-align: center; }
+#settings-panel h3 { margin-top: 6px; }
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.set-row input[type="checkbox"], .set-row input[type="radio"] {
+  width: 18px; height: 18px;
+  accent-color: #3d5bbf;
+  cursor: pointer;
+}
+.set-row input[type="range"] { flex: 1; accent-color: #3d5bbf; cursor: pointer; }
+#set-volume-txt { min-width: 48px; text-align: right; font-variant-numeric: tabular-nums; }
+#set-ctrl-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.set-hint { font-size: 0.85rem; color: #aab4d0; line-height: 1.4; }
+#records-list {
+  margin: 0 0 4px 22px;
+  font-size: 0.92rem;
+  color: #c4cde6;
+  max-height: 200px;
+  overflow-y: auto;
+}
+#records-list li { padding: 1px 0; }
+#records-list .rec-time { color: #ffd24a; font-variant-numeric: tabular-nums; }
+#btn-close-settings {
+  align-self: center;
+  padding: 10px 30px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  background: #3d5bbf;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+#btn-close-settings:hover { background: #5573dd; }
+
 .help {
   max-width: 520px;
   background: rgba(20, 26, 50, 0.7);

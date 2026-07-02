@@ -20,6 +20,7 @@
       Attention : le carburant est compté.</p>
     <p class="subtitle" id="menu-eggs"></p>
     <div id="level-grid"></div>
+    <button id="btn-settings" class="menu-btn">⚙ Réglages</button>
     <div class="help">
       <h3>Commandes</h3>
       <ul>
@@ -71,6 +72,36 @@
     </div>
     <div id="stab" class="hidden"></div>
     <div id="toast" class="hidden"></div>
+  </div>
+
+  <!-- ===== Réglages ===== -->
+  <div id="settings" class="screen hidden">
+    <div id="settings-panel">
+      <h2>⚙ Réglages</h2>
+      <label class="set-row">
+        <input type="checkbox" id="set-sound" />
+        <span>Son activé</span>
+      </label>
+      <label class="set-row">
+        <span>Volume</span>
+        <input type="range" id="set-volume" min="0" max="100" step="5" />
+        <span id="set-volume-txt">70 %</span>
+      </label>
+      <label class="set-row">
+        <input type="checkbox" id="set-ghost" />
+        <span>Fantôme du record 👻</span>
+      </label>
+      <div class="set-row" id="set-ctrl-row">
+        <span>Commandes :</span>
+        <label><input type="radio" name="set-ctrl" id="set-kb" /> Clavier</label>
+        <label><input type="radio" name="set-ctrl" id="set-kbm" /> Clavier + souris</label>
+      </div>
+      <p class="set-hint">En mode « clavier + souris », la caméra n'est plus verrouillée sur la
+        cible : déplacez la souris pour orbiter autour de la fusée, molette pour zoomer.</p>
+      <h3>🏁 Meilleurs temps</h3>
+      <ol id="records-list"></ol>
+      <button id="btn-close-settings">Fermer</button>
+    </div>
   </div>
 
   <!-- ===== Superposition (prêt / victoire / crash / pause) ===== -->

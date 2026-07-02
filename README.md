@@ -88,6 +88,16 @@ Le jeu est aussi directement hébergeable sur GitHub Pages (aucun build).
 - Un niveau réussi débloque le suivant (progression sauvegardée dans le
   navigateur via `localStorage`).
 
+## ⚙️ Réglages
+
+Le bouton **⚙ Réglages** du menu permet :
+- d'activer/désactiver le **son** et de régler le **volume** ;
+- d'activer/désactiver le **fantôme du record** ;
+- de consulter les **meilleurs temps** de chaque niveau ;
+- de choisir le mode de commande : **Clavier** (caméra automatique qui
+  garde la cible dans l'axe) ou **Clavier + souris** (caméra libre :
+  la souris fait orbiter la vue autour de la fusée, molette pour zoomer).
+
 ## 🌌 Les 10 niveaux — un monde différent à chaque fois
 
 | # | Nom | Environnement |
