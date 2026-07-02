@@ -131,3 +131,17 @@ html, body {
 .stat span { font-variant-numeric: tabular-nums; }
 .stat span.ok { color: #6fe08a; }
 .stat span.bad { color: #ff7b6b; }
+
+#stab {
+  position: absolute;
+  bottom: 100px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(10, 14, 30, 0.72);
+  border: 1px solid #3dbf6e;
+  border-radius: 10px;
+  padding: 10px 24px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #6fe08a;
+  white-space: nowrap;
+}

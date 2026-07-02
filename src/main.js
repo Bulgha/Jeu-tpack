@@ -15,10 +15,20 @@ const ANG_DAMP = 1.8;       // amortissement angulaire (exponentiel, 1/s)
 const ROCKET_BOTTOM = 2.8;  // distance centre → bas de la fusée
 const PLATFORM_TOP = 2;     // hauteur du dessus de la plateforme
 
-// Seuils d'un atterrissage réussi
-const SAFE_VSPEED = 7.0;    // m/s vitesse verticale max au contact
-const SAFE_HSPEED = 5.0;    // m/s vitesse horizontale max
-const SAFE_TILT = 25;       // ° d'inclinaison max
+// Atterrissage : les trains sortent automatiquement près de la cible ; le
+// niveau est réussi quand les 4 pieds reposent sur la plateforme, immobiles
+// pendant STABLE_TIME. Le vrai danger : basculer sur le côté.
+const STABLE_TIME = 2;      // s d'immobilité requises sur la cible
+const TIP_ANGLE = 60;       // ° : au-delà, la fusée a basculé
+const IMPACT_MAX = 12;      // m/s : impact vertical qui casse la structure
+const LEG_ANGLE = 0.7;      // rad : ouverture des trains déployés
+const LEG_PIVOT_Y = -1.85, LEG_PIVOT_R = 0.82, LEG_LEN = 1.95;
+const CONTACT_K = 300;      // raideur du contact pied/sol
+const CONTACT_C = 30;       // amortissement du contact
+const FRICTION = 0.65;      // frottement des pieds
+const INERTIA = 4;          // inertie en rotation (masse = 1)
+const PHYS_H = 1 / 240;     // sous-pas d'intégration des contacts
+const HINT_V = 8, HINT_H = 6, HINT_TILT = 25; // seuils indicatifs du HUD
 
 const STORAGE_KEY = "tpack-unlocked";
 
@@ -229,6 +239,36 @@ const rocketMesh = new THREE.Group();
   rocketMesh.add(nozzle);
 }
 
+// Trains d'atterrissage : 4 jambes articulées, repliées le long du corps,
+// déployées automatiquement à l'approche de la cible.
+const legPivots = [];
+const FEET_LOCAL = []; // position des pieds (repère fusée), trains déployés
+{
+  const legMat = new THREE.MeshStandardMaterial({ color: 0x2c2f38, roughness: 0.5, metalness: 0.6 });
+  const strutGeo = new THREE.CylinderGeometry(0.07, 0.09, LEG_LEN, 8);
+  const footGeo = new THREE.CylinderGeometry(0.3, 0.34, 0.14, 10);
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    const pivot = new THREE.Group();
+    pivot.position.set(Math.cos(a) * LEG_PIVOT_R, LEG_PIVOT_Y, Math.sin(a) * LEG_PIVOT_R);
+    pivot.rotation.y = -a; // le X local du pivot pointe vers l'extérieur
+    const strut = new THREE.Mesh(strutGeo, legMat);
+    strut.position.y = -LEG_LEN / 2;
+    pivot.add(strut);
+    const foot = new THREE.Mesh(footGeo, legMat);
+    foot.position.y = -LEG_LEN;
+    pivot.add(foot);
+    rocketMesh.add(pivot);
+    legPivots.push(pivot);
+
+    FEET_LOCAL.push(new THREE.Vector3(
+      (LEG_PIVOT_R + LEG_LEN * Math.sin(LEG_ANGLE)) * Math.cos(a),
+      LEG_PIVOT_Y - LEG_LEN * Math.cos(LEG_ANGLE),
+      (LEG_PIVOT_R + LEG_LEN * Math.sin(LEG_ANGLE)) * Math.sin(a)
+    ));
+  }
+}
+
 // Flamme du moteur
 const flame = new THREE.Mesh(
   new THREE.ConeGeometry(0.55, 2.6, 14),
@@ -419,6 +459,12 @@ const vel = new THREE.Vector3();
 const quat = new THREE.Quaternion();
 const angVel = new THREE.Vector3();
 let fuel = 0, throttle = 1, elapsed = 0;
+let legsTriggered = false; // les trains ont reçu l'ordre de sortir
+let legsDeploy = 0;        // 0 repliés → 1 déployés
+let stableT = 0;           // temps d'immobilité sur la cible
+let grassT = 0;            // temps d'immobilité hors cible
+let feetOn = 0;            // pieds en contact avec la plateforme
+let wasContact = false;    // un pied touchait déjà au pas précédent
 
 let unlocked = parseInt(localStorage.getItem(STORAGE_KEY) || "1", 10);
 if (!(unlocked >= 1 && unlocked <= 10)) unlocked = 1;
@@ -464,6 +510,13 @@ function startLevel(i) {
   fuel = cfg.fuel;
   throttle = 1;
   elapsed = 0;
+  legsTriggered = false;
+  legsDeploy = 0;
+  stableT = 0;
+  grassT = 0;
+  feetOn = 0;
+  wasContact = false;
+  legPivots.forEach((p) => (p.rotation.z = 0));
   rocketMesh.visible = true;
   rocketMesh.position.copy(pos);
   rocketMesh.quaternion.copy(quat);
@@ -481,7 +534,8 @@ function startLevel(i) {
     `Niveau ${i + 1} — ${cfg.name}`,
     `Plateforme à ${dist} m (rayon ${cfg.platformRadius} m). Carburant : ${cfg.fuel} unités.` +
       (cfg.gravity > 10 ? " ⚠️ Gravité renforcée !" : "") +
-      `\nPosez-vous à moins de ${SAFE_VSPEED} m/s, incliné de moins de ${SAFE_TILT}°.`,
+      `\nLes trains d'atterrissage sortent automatiquement près de la cible.` +
+      `\nPosez les 4 pieds sur la plateforme et restez stable ${STABLE_TIME} s — sans basculer !`,
     [["Décoller 🚀", beginFlight]]
   );
 }
@@ -513,7 +567,6 @@ function landSuccess() {
   state = "landed";
   vel.set(0, 0, 0);
   angVel.set(0, 0, 0);
-  pos.y = PLATFORM_TOP + ROCKET_BOTTOM;
   audioThrust(0);
   audioSuccess();
 
@@ -535,18 +588,21 @@ function landSuccess() {
   }
 }
 
-function crash(reason) {
+function crash(reason, explode = true) {
   state = "crashed";
   audioThrust(0);
-  audioCrash();
-  rocketMesh.visible = false;
   flame.visible = flameCore.visible = false;
-  spawnDebris(pos.clone());
+  flameLight.intensity = 0;
+  if (explode) {
+    audioCrash();
+    rocketMesh.visible = false;
+    spawnDebris(pos.clone());
+  }
 
   const id = runId;
   setTimeout(() => {
     if (id !== runId || state !== "crashed") return;
-    showOverlay("💥 Crash !", reason, [
+    showOverlay(explode ? "💥 Crash !" : "❌ Raté !", reason, [
       ["Réessayer (R)", () => startLevel(levelIndex)],
       ["Menu", showMenu],
     ]);
@@ -561,6 +617,15 @@ const _fwd = new THREE.Vector3();
 const _dq = new THREE.Quaternion();
 const _up = new THREE.Vector3();
 const _p = new THREE.Vector3();
+const _foot = new THREE.Vector3();
+const _r = new THREE.Vector3();
+const _vp = new THREE.Vector3();
+const _F = new THREE.Vector3();
+
+// Hauteur du sol sous un point : plateau de la plateforme ou prairie.
+function surfaceYAt(x, z) {
+  return Math.hypot(x, z) < cfg.platformRadius + 0.4 ? PLATFORM_TOP : 0;
+}
 
 function physicsStep(dt) {
   elapsed += dt;
@@ -580,23 +645,66 @@ function physicsStep(dt) {
   }
   if (yaw) angVel.addScaledVector(UP, yaw * YAW_ACCEL * dt);
 
-  angVel.multiplyScalar(Math.exp(-ANG_DAMP * dt));
+  // --- Trains d'atterrissage : sortie automatique près de la cible ---
+  const hDistNow = Math.hypot(pos.x, pos.z);
+  if (hDistNow < cfg.platformRadius + 40 && pos.y - PLATFORM_TOP < 45) legsTriggered = true;
+  if (legsTriggered && legsDeploy < 1) legsDeploy = Math.min(1, legsDeploy + dt / 0.8);
+  legPivots.forEach((p) => (p.rotation.z = LEG_ANGLE * legsDeploy));
+  const legsOut = legsDeploy >= 0.95;
 
-  const w = angVel.length();
-  if (w > 1e-6) {
-    _dq.setFromAxisAngle(_axis.copy(angVel).divideScalar(w), w * dt);
-    quat.premultiply(_dq).normalize();
-  }
-
-  // --- Poussée & gravité ---
+  // --- Poussée & carburant (au sol comme en vol : on peut se rattraper) ---
   const thrusting = input.thrust && fuel > 0;
-  if (thrusting) {
-    _up.set(0, 1, 0).applyQuaternion(quat);
-    vel.addScaledVector(_up, MAX_THRUST * throttle * dt);
-    fuel = Math.max(0, fuel - BURN_RATE * throttle * dt);
+  if (thrusting) fuel = Math.max(0, fuel - BURN_RATE * throttle * dt);
+
+  // --- Intégration en sous-pas : les contacts pied/sol sont raides ---
+  const vyBefore = vel.y;
+  let newContact = false;
+  let anyContact = false;
+  const steps = Math.max(1, Math.ceil(dt / PHYS_H));
+  const h = dt / steps;
+  for (let s = 0; s < steps; s++) {
+    if (thrusting) {
+      _up.set(0, 1, 0).applyQuaternion(quat);
+      vel.addScaledVector(_up, MAX_THRUST * throttle * h);
+    }
+    vel.y -= cfg.gravity * h;
+
+    if (legsOut) {
+      for (const fl of FEET_LOCAL) {
+        _foot.copy(fl).applyQuaternion(quat).add(pos);
+        const pen = surfaceYAt(_foot.x, _foot.z) - _foot.y;
+        if (pen <= 0) continue;
+        if (!wasContact) newContact = true;
+        anyContact = true;
+
+        _r.copy(_foot).sub(pos);                    // bras de levier
+        _vp.copy(angVel).cross(_r).add(vel);        // vitesse du point de contact
+        // Force normale (ressort amorti, plafonnée), masse = 1
+        let fn = CONTACT_K * Math.min(pen, 0.25) - CONTACT_C * _vp.y;
+        fn = Math.max(0, Math.min(fn, 200));
+        _F.set(0, fn, 0);
+        // Frottement horizontal, plafonné par μ·Fn
+        const vh = Math.hypot(_vp.x, _vp.z);
+        if (vh > 1e-4) {
+          const ff = Math.min(40 * vh, FRICTION * fn);
+          _F.x -= (_vp.x / vh) * ff;
+          _F.z -= (_vp.z / vh) * ff;
+        }
+        vel.addScaledVector(_F, h);
+        _r.cross(_F);                               // couple = r × F
+        angVel.addScaledVector(_r, h / INERTIA);
+      }
+    }
+
+    angVel.multiplyScalar(Math.exp(-ANG_DAMP * h));
+    pos.addScaledVector(vel, h);
+    const w = angVel.length();
+    if (w > 1e-6) {
+      _dq.setFromAxisAngle(_axis.copy(angVel).divideScalar(w), w * h);
+      quat.premultiply(_dq).normalize();
+    }
   }
-  vel.y -= cfg.gravity * dt;
-  pos.addScaledVector(vel, dt);
+  wasContact = anyContact;
 
   audioThrust(thrusting ? throttle : 0);
 
@@ -614,7 +722,33 @@ function physicsStep(dt) {
   rocketMesh.position.copy(pos);
   rocketMesh.quaternion.copy(quat);
 
+  // --- Premier contact trop violent : la structure casse ---
+  if (newContact && vyBefore < -IMPACT_MAX) {
+    crash(`Impact trop violent : ${(-vyBefore).toFixed(1)} m/s à la verticale (max ${IMPACT_MAX}).`);
+    return;
+  }
+
   checkCollisions();
+  if (state !== "flying") return;
+
+  // --- Stabilisation : 4 pieds posés + immobilité pendant STABLE_TIME ---
+  feetOn = 0;
+  let onGrass = 0;
+  if (legsOut) {
+    for (const fl of FEET_LOCAL) {
+      _foot.copy(fl).applyQuaternion(quat).add(pos);
+      const hd = Math.hypot(_foot.x, _foot.z);
+      if (_foot.y <= PLATFORM_TOP + 0.08 && hd <= cfg.platformRadius + 0.3) feetOn++;
+      else if (_foot.y <= 0.08) onGrass++;
+    }
+  }
+  const still = vel.length() < 0.4 && angVel.length() < 0.3;
+  stableT = feetOn === 4 && still ? stableT + dt : 0;
+  grassT = onGrass === 4 && still ? grassT + dt : 0;
+  if (stableT >= STABLE_TIME) landSuccess();
+  else if (grassT >= STABLE_TIME) {
+    crash("La fusée s'est posée… mais hors de la plateforme. Visez la cible !", false);
+  }
 }
 
 function tiltDeg() {
@@ -635,27 +769,30 @@ function checkCollisions() {
     }
   }
 
-  const bottomY = pos.y - ROCKET_BOTTOM;
-  const hDist = Math.hypot(pos.x, pos.z);
-
-  // Contact avec la plateforme — l'atterrissage est valide n'importe où sur
-  // le plateau, du moment que le pied de la fusée (rayon ~0,9 m) le touche.
-  if (bottomY <= PLATFORM_TOP + 0.05 && hDist < cfg.platformRadius + 2.0) {
-    const vs = -vel.y;
-    const hs = Math.hypot(vel.x, vel.z);
-    const tilt = tiltDeg();
-    if (vs > SAFE_VSPEED) crash(`Impact trop violent : ${vs.toFixed(1)} m/s à la verticale (max ${SAFE_VSPEED}).`);
-    else if (tilt > SAFE_TILT) crash(`Fusée trop inclinée au contact : ${Math.round(tilt)}° (max ${SAFE_TILT}°).`);
-    else if (hs > SAFE_HSPEED) crash(`La fusée glissait trop vite : ${hs.toFixed(1)} m/s à l'horizontale (max ${SAFE_HSPEED}).`);
-    else if (hDist > cfg.platformRadius + 0.9) crash("La fusée s'est posée à cheval sur le bord de la plateforme.");
-    else landSuccess();
+  // Basculement : au-delà de TIP_ANGLE, la fusée est tombée
+  if (tiltDeg() > TIP_ANGLE) {
+    crash("La fusée a basculé sur le côté !");
     return;
   }
 
-  // Sol
-  if (bottomY <= 0) { crash("La fusée s'est écrasée sur le terrain."); return; }
+  // Corps de la fusée contre le sol ou la plateforme (nez, centre, moteur).
+  // Les pieds, eux, sont gérés par les contacts physiques.
+  for (const ly of [3.55, 0, -2.75]) {
+    _p.set(0, ly, 0).applyQuaternion(quat).add(pos);
+    const sy = surfaceYAt(_p.x, _p.z);
+    if (_p.y < sy - 0.05) {
+      crash(ly > 0 ? "Le nez de la fusée a heurté le sol." : "La fusée s'est écrasée au sol.");
+      return;
+    }
+    // Percuté le flanc de la plateforme
+    if (sy === PLATFORM_TOP && _p.y < PLATFORM_TOP - 0.8) {
+      crash("La fusée a percuté le flanc de la plateforme.");
+      return;
+    }
+  }
 
   // Hors zone
+  const hDist = Math.hypot(pos.x, pos.z);
   if (hDist > 1200 || pos.y > 800) crash("Fusée perdue — sortie de la zone de vol.");
 }
 
@@ -712,19 +849,34 @@ function updateHUD() {
 
   const hDist = Math.hypot(pos.x, pos.z);
   const surface = hDist < cfg.platformRadius ? PLATFORM_TOP : 0;
-  const alt = Math.max(0, pos.y - ROCKET_BOTTOM - surface);
+  const bottom = legsDeploy > 0.5 ? -FEET_LOCAL[0].y : ROCKET_BOTTOM;
+  const alt = Math.max(0, pos.y - bottom - surface);
   setStat("stat-alt", `${alt.toFixed(0)} m`);
 
   const vs = vel.y;
-  setStat("stat-vs", `${vs >= 0 ? "+" : ""}${vs.toFixed(1)} m/s`, Math.abs(vs) <= SAFE_VSPEED);
+  setStat("stat-vs", `${vs >= 0 ? "+" : ""}${vs.toFixed(1)} m/s`, Math.abs(vs) <= HINT_V);
 
   const hs = Math.hypot(vel.x, vel.z);
-  setStat("stat-hs", `${hs.toFixed(1)} m/s`, hs <= SAFE_HSPEED);
+  setStat("stat-hs", `${hs.toFixed(1)} m/s`, hs <= HINT_H);
 
   const tilt = tiltDeg();
-  setStat("stat-tilt", `${Math.round(tilt)}°`, tilt <= SAFE_TILT);
+  setStat("stat-tilt", `${Math.round(tilt)}°`, tilt <= HINT_TILT);
 
   setStat("stat-dist", `${Math.round(hDist)} m`);
+
+  setStat("stat-legs", legsDeploy >= 0.95 ? "Sortis" : legsTriggered ? "Sortie…" : "Repliés",
+    legsDeploy >= 0.95 ? true : undefined);
+
+  // Compteur de stabilisation
+  const stab = $("stab");
+  if (state === "flying" && feetOn === 4) {
+    stab.classList.remove("hidden");
+    stab.textContent = stableT > 0
+      ? `Stabilisation… ${Math.min(stableT, STABLE_TIME).toFixed(1)} / ${STABLE_TIME.toFixed(1)} s`
+      : "Stabilisez la fusée !";
+  } else {
+    stab.classList.add("hidden");
+  }
 }
 
 /* ============================= Entrées ================================== */
@@ -801,12 +953,19 @@ function animate() {
   GAME.state = state;
   GAME.fuel = fuel;
   GAME.level = levelIndex + 1;
+  GAME.legs = legsDeploy;
+  GAME.feetOn = feetOn;
+  GAME.stableT = stableT;
 
   renderer.render(scene, camera);
 }
 
 // Exposé pour le débogage et les tests automatisés
-const GAME = { state, fuel, level: 1, pos, vel, quat, camDir, startLevel, beginFlight, showMenu };
+const GAME = {
+  state, fuel, level: 1, pos, vel, quat, angVel, camDir, startLevel, beginFlight, showMenu,
+  legs: 0, feetOn: 0, stableT: 0,
+  deployLegs() { legsTriggered = true; legsDeploy = 1; },
+};
 window.GAME = GAME;
 
 showMenu();

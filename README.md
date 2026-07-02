@@ -56,12 +56,17 @@ Le jeu est aussi directement hébergeable sur GitHub Pages (aucun build).
 
 ## 🏁 Règles
 
-- L'atterrissage est réussi si, au contact de la plateforme :
-  - vitesse verticale ≤ **7 m/s** ;
-  - vitesse horizontale ≤ **5 m/s** ;
-  - inclinaison ≤ **25°** ;
-  - le pied de la fusée touche le plateau — **n'importe où**, même au bord.
-- Toucher un astéroïde, le sol, ou arriver trop vite = 💥 crash.
+- Les **trains d'atterrissage** (4 pieds) sortent automatiquement à
+  l'approche de la cible.
+- Le niveau est réussi quand les **4 pieds reposent sur la plateforme**
+  et que la fusée reste **immobile pendant 2 secondes** — n'importe où
+  sur le plateau.
+- Le vrai danger n'est plus d'arriver vite, mais de **basculer** : la
+  fusée a une vraie physique de contact (rebonds, glissade, couples).
+  Arrivez trop penché ou trop vite en latéral et elle versera. Le moteur
+  reste utilisable au sol pour rattraper un début de bascule.
+- Toucher un astéroïde, heurter le sol avec le corps, ou taper la
+  plateforme à plus de **12 m/s** = 💥 crash.
 - Le réservoir est plein au départ de chaque niveau, mais de plus en plus
   juste au fil des niveaux — gérez la poussée !
 - Un niveau réussi débloque le suivant (progression sauvegardée dans le
