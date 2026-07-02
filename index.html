@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fusée T-Pack — Atterrissage</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚀</text></svg>" />
+  <link rel="stylesheet" href="./style.css" />
+  <script type="importmap">
+    { "imports": { "three": "./lib/three.module.min.js" } }
+  </script>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <!-- ===== Menu principal ===== -->
+  <div id="menu" class="screen">
+    <h1>🚀 Fusée T-Pack</h1>
+    <p class="subtitle">Traversez le champ d'astéroïdes et posez-vous sur la plateforme.<br/>
+      Attention : le carburant est compté.</p>
+    <div id="level-grid"></div>
+    <div class="help">
+      <h3>Commandes</h3>
+      <ul>
+        <li><b>↑ / ↓</b> — tangage (avant / arrière)</li>
+        <li><b>← / →</b> — roulis (gauche / droite)</li>
+        <li><b>Page ↑ / Page ↓</b> — lacet (rotation)</li>
+        <li><b>Espace</b> (maintenu) — propulsion</li>
+        <li><b>+ / −</b> — régler la puissance de poussée</li>
+        <li><b>R</b> — recommencer &nbsp;·&nbsp; <b>P</b> — pause &nbsp;·&nbsp; <b>Échap</b> — menu</li>
+      </ul>
+      <p>Pour réussir : touchez la plateforme <b>lentement</b>, <b>bien vertical</b> et <b>au centre</b>.</p>
+    </div>
+  </div>
+
+  <!-- ===== HUD ===== -->
+  <div id="hud" class="hidden">
+    <div id="hud-top">
+      <span id="hud-level">Niveau 1/10</span>
+      <span id="hud-name"></span>
+    </div>
+    <div id="hud-left">
+      <div class="gauge">
+        <label>Carburant</label>
+        <div class="bar"><div id="fuel-fill"></div></div>
+        <span id="fuel-txt">100</span>
+      </div>
+      <div class="gauge">
+        <label>Poussée</label>
+        <div class="bar"><div id="throttle-fill"></div></div>
+        <span id="throttle-txt">100 %</span>
+      </div>
+    </div>
+    <div id="hud-right">
+      <div class="stat"><label>Altitude</label><span id="stat-alt">0 m</span></div>
+      <div class="stat"><label>V. verticale</label><span id="stat-vs">0.0 m/s</span></div>
+      <div class="stat"><label>V. horizontale</label><span id="stat-hs">0.0 m/s</span></div>
+      <div class="stat"><label>Inclinaison</label><span id="stat-tilt">0°</span></div>
+      <div class="stat"><label>Distance plateforme</label><span id="stat-dist">0 m</span></div>
+    </div>
+  </div>
+
+  <!-- ===== Superposition (prêt / victoire / crash / pause) ===== -->
+  <div id="overlay" class="screen hidden">
+    <h2 id="overlay-title"></h2>
+    <p id="overlay-text"></p>
+    <div id="overlay-buttons"></div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
