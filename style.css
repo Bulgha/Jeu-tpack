@@ -161,6 +161,7 @@ html, body {
 }
 #hud-level { font-weight: 700; font-size: 1.1rem; }
 #hud-name { color: #aab4d0; font-style: italic; }
+#hud-cam { color: #8fd8ff; font-size: 0.95rem; }
 #hud-timer {
   font-weight: 700;
   font-size: 1.1rem;

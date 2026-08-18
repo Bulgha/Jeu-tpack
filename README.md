@@ -51,6 +51,7 @@ Le jeu est aussi directement hébergeable sur GitHub Pages (aucun build).
 | **Espace** (maintenu) | Propulsion |
 | **+ / −** | Régler la puissance de poussée (10 % – 100 %) |
 | **Molette / pavé tactile** | Zoomer / dézoomer la caméra |
+| **C** | Changer de caméra : **cible** 🎯 ou **fusée** 🚀 (clic droit en mode souris) |
 | **R** | Recommencer le niveau |
 | **P** | Pause |
 | **Échap** | Retour au menu |
@@ -94,10 +95,17 @@ Le bouton **⚙ Réglages** du menu permet :
 - d'activer/désactiver le **son** et de régler le **volume** ;
 - d'activer/désactiver le **fantôme du record** ;
 - de consulter les **meilleurs temps** de chaque niveau ;
-- de choisir le mode de commande : **Clavier** (caméra automatique qui
-  garde la cible dans l'axe) ou **Clavier + souris** (caméra libre :
-  la souris fait orbiter la vue autour de la fusée, molette pour zoomer,
-  **clic gauche maintenu = propulsion**).
+- de choisir le mode de commande : **Clavier** ou **Clavier + souris**
+  (la souris oriente la caméra fusée, molette pour zoomer, **clic gauche
+  maintenu = propulsion**, **clic droit = changement de caméra**).
+
+Deux caméras, façon Rocket League, dans les deux modes :
+- **caméra cible 🎯** — verrouillée sur la plateforme, toujours dans l'axe ;
+- **caméra fusée 🚀** — suit la fusée : derrière son déplacement au
+  clavier, orbite libre à la souris.
+
+Bascule avec **C** (clavier) ou **clic droit** (souris) ; la caméra
+active est affichée dans le bandeau du haut.
 
 ## 🌌 Les 10 niveaux — un monde différent à chaque fois
 

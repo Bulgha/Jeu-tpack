@@ -1739,6 +1739,7 @@ const camDir = new THREE.Vector3(0, 0, 1);
 const _camTarget = new THREE.Vector3();
 const _desired = new THREE.Vector3();
 let camZoom = 1; // molette / pavé tactile : 0.45 (près) … 2.5 (loin)
+let camMode = "target"; // « target » : verrouillée sur la cible · « rocket » : suit la fusée
 let camYaw = 0;  // orientation de l'orbite caméra (mode « clavier + souris »)
 const DEF_PITCH = Math.atan(11 / 26);
 let camPitch = DEF_PITCH;
@@ -1757,11 +1758,22 @@ window.addEventListener("mousemove", (e) => {
   camPitch = THREE.MathUtils.clamp(camPitch + e.movementY * 0.0035, 0.08, 1.15);
 });
 
-// Mode « clavier + souris » : clic gauche maintenu = propulsion
+// Bascule caméra cible ↔ caméra fusée (façon Rocket League) :
+// touche C au clavier, clic droit en mode souris.
+function toggleCamMode() {
+  camMode = camMode === "target" ? "rocket" : "target";
+  camYaw = Math.atan2(camDir.x, camDir.z); // pas de saut de vue au changement
+  showToast(camMode === "target" ? "🎥 Caméra cible" : "🎥 Caméra fusée");
+}
+
+// Mode « clavier + souris » : clic gauche maintenu = propulsion,
+// clic droit = changement de caméra
 window.addEventListener("mousedown", (e) => {
-  if (!settings.mouseCam || e.button !== 0) return;
+  if (!settings.mouseCam) return;
   if (state === "menu" || state === "paused") return;
   if (e.target.closest("button, input, label, #settings, #overlay-buttons")) return;
+  if (e.button === 2) { toggleCamMode(); return; }
+  if (e.button !== 0) return;
   ensureAudio();
   mouseThrust = true;
   if (state === "ready") beginFlight();
@@ -1769,13 +1781,16 @@ window.addEventListener("mousedown", (e) => {
 window.addEventListener("mouseup", (e) => {
   if (e.button === 0) mouseThrust = false;
 });
+window.addEventListener("contextmenu", (e) => {
+  if (settings.mouseCam && state !== "menu") e.preventDefault();
+});
 
 function updateCamera(dt, snap = false) {
-  if (settings.mouseCam) {
-    // Caméra libre : orbite pilotée à la souris
+  if (settings.mouseCam && camMode === "rocket") {
+    // Caméra fusée, mode souris : orbite libre pilotée à la souris
     camDir.set(Math.sin(camYaw), 0, Math.cos(camYaw));
-  } else {
-    // Caméra automatique : garde la plateforme dans l'axe
+  } else if (camMode === "target") {
+    // Caméra cible (les deux modes) : garde la plateforme dans l'axe
     _desired.set(pos.x, 0, pos.z);
     if (_desired.lengthSq() > 1) _desired.normalize();
     else _desired.copy(camDir);
@@ -1788,6 +1803,14 @@ function updateCamera(dt, snap = false) {
 
     if (snap) camDir.copy(_desired);
     else camDir.lerp(_desired, 1 - Math.exp(-1.6 * dt)).normalize();
+    camYaw = Math.atan2(camDir.x, camDir.z);
+  } else {
+    // Caméra fusée, mode clavier : se place derrière le sens du déplacement
+    _desired.set(-vel.x, 0, -vel.z);
+    if (_desired.lengthSq() > 2.25) _desired.normalize(); // > 1,5 m/s
+    else _desired.copy(camDir);
+    if (snap) camDir.copy(_desired);
+    else camDir.lerp(_desired, 1 - Math.exp(-1.8 * dt)).normalize();
     camYaw = Math.atan2(camDir.x, camDir.z);
   }
 
@@ -1848,6 +1871,8 @@ function updateHUD() {
 
   setStat("stat-dist", `${Math.round(hDist)} m`);
 
+  $("hud-cam").textContent = camMode === "target" ? "🎥 Cible" : "🎥 Fusée";
+
   setStat("stat-legs", legsDeploy >= 0.95 ? "Sortis" : legsDeploy > 0.02 ? "Manœuvre…" : allPieces() ? "Repliés" : "Verrouillés 🔒",
     legsDeploy >= 0.95 ? true : undefined);
 
@@ -1907,6 +1932,8 @@ window.addEventListener("keydown", (e) => {
     throttle = Math.max(0.1, Math.round((throttle - 0.1) * 10) / 10);
   } else if (e.code === "KeyR") {
     if (state !== "menu") startLevel(levelIndex);
+  } else if (e.code === "KeyC") {
+    if (state !== "menu") toggleCamMode();
   } else if (e.code === "KeyP") {
     togglePause();
   } else if (e.code === "KeyN") {
@@ -1979,6 +2006,7 @@ function animate() {
   GAME.elapsed = elapsed;
   GAME.ghostVisible = !!(ghostMesh && ghostMesh.visible);
   GAME.ghostFrames = ghostFrames.length;
+  GAME.camMode = camMode;
 
   renderer.render(scene, camera);
 }
